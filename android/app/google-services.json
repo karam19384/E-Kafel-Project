@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "62114485232",
+    "project_id": "subtle-palisade-463718-s7",
+    "storage_bucket": "subtle-palisade-463718-s7.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:62114485232:android:430614920ca01aef904335",
+        "android_client_info": {
+          "package_name": "com.example.e_kafel"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCSVPnuc440M_LxI2SZIAh1nNYYLN9rXzs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
