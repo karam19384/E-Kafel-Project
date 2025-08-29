@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
@@ -52,7 +53,9 @@ class _OrphanDetailsScreenState extends State<OrphanDetailsScreen> {
         _isLoading = false;
         _errorMessage = 'Error loading orphan details: $e';
       });
-      print('Error fetching orphan details: $e');
+      if (kDebugMode) {
+        print('Error fetching orphan details: $e');
+      }
     }
   }
 
@@ -120,7 +123,9 @@ class _OrphanDetailsScreenState extends State<OrphanDetailsScreen> {
             SnackBar(content: Text('Failed to delete orphan: $e')),
           );
         }
-        print('Error deleting orphan: $e');
+        if (kDebugMode) {
+          print('Error deleting orphan: $e');
+        }
       } finally {
         setState(() {
           _isLoading = false;
@@ -293,7 +298,9 @@ class _OrphanDetailsScreenState extends State<OrphanDetailsScreen> {
                         ),
                       );
                     }
-                    print('Error adding sponsorship: $e');
+                    if (kDebugMode) {
+                      print('Error adding sponsorship: $e');
+                    }
                   }
                 }
               },
@@ -329,7 +336,9 @@ class _OrphanDetailsScreenState extends State<OrphanDetailsScreen> {
           'dd/MM/yyyy',
         ).format(DateTime.parse(_orphanData!['latestSupportDate']));
       } catch (e) {
-        print('Error parsing lastSupportDate: $e');
+        if (kDebugMode) {
+          print('Error parsing lastSupportDate: $e');
+        }
       }
     }
 

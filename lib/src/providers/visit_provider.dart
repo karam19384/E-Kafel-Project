@@ -1,5 +1,5 @@
 // ملف: lib/providers/visit_provider.dart
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/visit.dart';
 
@@ -25,7 +25,9 @@ class VisitProvider with ChangeNotifier {
       
       notifyListeners();
     } catch (error) {
-      print('Error fetching visits: $error');
+      if (kDebugMode) {
+        print('Error fetching visits: $error');
+      }
     } finally {
       _setLoading(false);
     }

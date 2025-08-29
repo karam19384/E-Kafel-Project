@@ -8,7 +8,7 @@ import 'package:e_kafel/src/blocs/auth/auth_bloc.dart';
 import 'login_screen.dart';
 
 class SponsorshipManagementScreen extends StatefulWidget {
-  const SponsorshipManagementScreen({Key? key}) : super(key: key);
+  const SponsorshipManagementScreen({super.key});
 
   @override
   State<SponsorshipManagementScreen> createState() =>

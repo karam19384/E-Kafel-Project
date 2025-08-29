@@ -10,7 +10,7 @@ import 'package:e_kafel/src/blocs/auth/auth_bloc.dart';
 import 'login_screen.dart';
 
 class TasksScreen extends StatefulWidget {
-  const TasksScreen({Key? key}) : super(key: key);
+  const TasksScreen({super.key});
 
   @override
   State<TasksScreen> createState() => _TasksScreenState();

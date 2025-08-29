@@ -7,7 +7,7 @@ import 'package:e_kafel/src/blocs/auth/auth_bloc.dart';
 import 'login_screen.dart';
 
 class SendSMSScreen extends StatefulWidget {
-  const SendSMSScreen({Key? key}) : super(key: key);
+  const SendSMSScreen({super.key});
 
   @override
   State<SendSMSScreen> createState() => _SendSMSScreenState();

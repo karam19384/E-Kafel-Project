@@ -7,7 +7,7 @@ import 'package:e_kafel/src/blocs/auth/auth_bloc.dart';
 import 'login_screen.dart';
 
 class ReportsScreen extends StatelessWidget {
-  const ReportsScreen({Key? key}) : super(key: key);
+  const ReportsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
