@@ -1,3 +1,5 @@
+// lib/src/screens/signup_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../blocs/auth/auth_bloc.dart';
@@ -12,9 +14,9 @@ class SignUpScreen extends StatefulWidget {
 
 class _SignUpScreenState extends State<SignUpScreen> {
   final _institutionNameController = TextEditingController();
-  final _institutionAddressController = TextEditingController(); // حقل جديد
-  final _institutionEmailController = TextEditingController(); // حقل جديد
-  final _institutionWebsiteController = TextEditingController(); // حقل جديد
+  final _institutionAddressController = TextEditingController();
+  final _institutionEmailController = TextEditingController();
+  final _institutionWebsiteController = TextEditingController();
   final _headNameController = TextEditingController();
   final _headEmailController = TextEditingController();
   final _headMobileNumberController = TextEditingController();
@@ -40,231 +42,216 @@ class _SignUpScreenState extends State<SignUpScreen> {
     super.dispose();
   }
 
+  void _onSignUp() {
+    if (_formKey.currentState!.validate()) {
+      context.read<AuthBloc>().add(
+            SignUpButtonPressed(
+              name: _institutionNameController.text.trim(),
+              email: _institutionEmailController.text.trim(),
+              password: _passwordController.text.trim(),
+              address: _institutionAddressController.text.trim(),
+              website: _institutionWebsiteController.text.trim(),
+              headName: _headNameController.text.trim(),
+              headEmail: _headEmailController.text.trim(),
+              headMobileNumber: _headMobileNumberController.text.trim(),
+              userRole: 'kafala_head',
+            ),
+          );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF0E8EB),
-      appBar: AppBar(
-        title: const Text('Add a new institution'),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Color(0xFF4C7F7F)),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-      ),
       body: BlocListener<AuthBloc, AuthState>(
         listener: (context, state) {
           if (state is AuthAuthenticated) {
-            Navigator.of(context).pushAndRemoveUntil(
+            Navigator.of(context).pushReplacement(
               MaterialPageRoute(builder: (_) => const HomeScreen()),
-              (Route<dynamic> route) => false,
             );
           } else if (state is AuthErrorState) {
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(SnackBar(content: Text(state.message)));
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(state.message)),
+            );
           }
         },
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(20.0),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Image.asset(
-                    'assets/images/logo.png',
-                    height: 100,
-                    width: 100,
-                  ),
-                  const SizedBox(height: 10),
-                  const Text(
-                    'Sign Up',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF4C7F7F),
-                    ),
-                  ),
-                  const SizedBox(height: 40),
-
-                  // حقول تفاصيل الجمعية
-                  const Text(
-                    'Institution Details',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF4C7F7F),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  _buildInputField(
-                    controller: _institutionNameController,
-                    labelText: 'Name of the institution',
-                    validator: (value) => value == null || value.isEmpty
-                        ? 'Please enter institution name'
-                        : null,
-                  ),
-                  const SizedBox(height: 20),
-                  _buildInputField(
-                    controller: _institutionEmailController,
-                    labelText: 'Institution Email',
-                    keyboardType: TextInputType.emailAddress,
-                    validator: (value) => value == null || !value.contains('@')
-                        ? 'Please enter a valid email'
-                        : null,
-                  ),
-                  const SizedBox(height: 20),
-                  _buildInputField(
-                    controller: _institutionAddressController,
-                    labelText: 'Institution Address',
-                    validator: (value) => value == null || value.isEmpty
-                        ? 'Please enter institution address'
-                        : null,
-                  ),
-                  const SizedBox(height: 20),
-                  _buildInputField(
-                    controller: _institutionWebsiteController,
-                    labelText: 'Institution Website (Optional)',
-                    keyboardType: TextInputType.url,
-                  ),
-                  const SizedBox(height: 40),
-
-                  // حقول تفاصيل المسؤول (Kafala Head)
-                  const Text(
-                    'Kafala Head Account Details',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF4C7F7F),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  _buildInputField(
-                    controller: _headNameController,
-                    labelText: 'Name of the Kafala Head',
-                    validator: (value) => value == null || value.isEmpty
-                        ? 'Please enter the name of the Kafala Head'
-                        : null,
-                  ),
-                  const SizedBox(height: 20),
-                  _buildInputField(
-                    controller: _headEmailController,
-                    labelText: 'Enter your email (for login)',
-                    keyboardType: TextInputType.emailAddress,
-                    validator: (value) => value == null || !value.contains('@')
-                        ? 'Please enter a valid email'
-                        : null,
-                  ),
-                  const SizedBox(height: 20),
-                  _buildInputField(
-                    controller: _headMobileNumberController,
-                    labelText: 'Enter mobile number',
-                    keyboardType: TextInputType.phone,
-                    validator: (value) => value == null || value.isEmpty
-                        ? 'Please enter mobile number'
-                        : null,
-                  ),
-                  const SizedBox(height: 20),
-                  _buildInputField(
-                    controller: _passwordController,
-                    labelText: 'Enter your password',
-                    obscureText: _obscurePassword,
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscurePassword
-                            ? Icons.visibility_off
-                            : Icons.visibility,
-                      ),
-                      onPressed: () =>
-                          setState(() => _obscurePassword = !_obscurePassword),
-                    ),
-                    validator: (value) => value == null || value.length < 6
-                        ? 'Password must be at least 6 characters'
-                        : null,
-                  ),
-                  const SizedBox(height: 20),
-                  _buildInputField(
-                    controller: _confirmPasswordController,
-                    labelText: 'Retype your password',
-                    obscureText: _obscureConfirmPassword,
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscureConfirmPassword
-                            ? Icons.visibility_off
-                            : Icons.visibility,
-                      ),
-                      onPressed: () => setState(
-                        () =>
-                            _obscureConfirmPassword = !_obscureConfirmPassword,
-                      ),
-                    ),
-                    validator: (value) => value != _passwordController.text
-                        ? 'Passwords do not match'
-                        : null,
-                  ),
-                  const SizedBox(height: 40),
-
-                  // زر التسجيل (SIGN UP)
-                  BlocBuilder<AuthBloc, AuthState>(
-                    builder: (context, state) {
-                      return state is AuthLoading
-                          ? const CircularProgressIndicator(
-                              color: Color(0xFF6DAF97),
-                            )
-                          : ElevatedButton(
-                              onPressed: () {
-                                if (_formKey.currentState!.validate()) {
-                                  BlocProvider.of<AuthBloc>(context).add(
-                                    SignUpButtonPressed(
-                                      name: _institutionNameController.text.trim(),
-                                      address: _institutionAddressController.text.trim(),
-                                      email: _institutionEmailController.text.trim(),
-                                      website: _institutionWebsiteController.text.trim(),
-                                      headName: _headNameController.text.trim(),
-                                      headEmail: _headEmailController.text.trim(),
-                                      headMobileNumber: _headMobileNumberController.text.trim(),
-                                      password: _passwordController.text.trim(), 
-                                      userRole: '',
-                                    ),
-                                  );
-                                }
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF6DAF97),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 50,
-                                  vertical: 15,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                              ),
-                              child: const Text(
-                                'SIGN UP',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
+        child: BlocBuilder<AuthBloc, AuthState>(
+          builder: (context, state) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: SingleChildScrollView(
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        // ... تصميم شاشة التسجيل
+                        _buildInputField(
+                          controller: _institutionNameController,
+                          labelText: 'اسم المؤسسة',
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'الرجاء إدخال اسم المؤسسة';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        _buildInputField(
+                          controller: _institutionAddressController,
+                          labelText: 'عنوان المؤسسة',
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'الرجاء إدخال عنوان المؤسسة';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        _buildInputField(
+                          controller: _institutionEmailController,
+                          labelText: 'بريد المؤسسة الإلكتروني',
+                          keyboardType: TextInputType.emailAddress,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'الرجاء إدخال بريد المؤسسة الإلكتروني';
+                            }
+                            if (!RegExp(r'\S+@\S+\.\S+').hasMatch(value)) {
+                              return 'صيغة البريد الإلكتروني غير صحيحة';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        _buildInputField(
+                          controller: _institutionWebsiteController,
+                          labelText: 'موقع المؤسسة',
+                        ),
+                        const SizedBox(height: 16),
+                        _buildInputField(
+                          controller: _headNameController,
+                          labelText: 'اسم رئيس قسم الكفالة',
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'الرجاء إدخال اسم رئيس القسم';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        _buildInputField(
+                          controller: _headEmailController,
+                          labelText: 'بريد رئيس القسم الإلكتروني',
+                          keyboardType: TextInputType.emailAddress,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'الرجاء إدخال بريد رئيس القسم الإلكتروني';
+                            }
+                            if (!RegExp(r'\S+@\S+\.\S+').hasMatch(value)) {
+                              return 'صيغة البريد الإلكتروني غير صحيحة';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        _buildInputField(
+                          controller: _headMobileNumberController,
+                          labelText: 'رقم جوال رئيس القسم',
+                          keyboardType: TextInputType.phone,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'الرجاء إدخال رقم الجوال';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        _buildInputField(
+                          controller: _passwordController,
+                          labelText: 'كلمة المرور',
+                          obscureText: _obscurePassword,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'الرجاء إدخال كلمة المرور';
+                            }
+                            if (value.length < 6) {
+                              return 'يجب أن تكون كلمة المرور 6 أحرف على الأقل';
+                            }
+                            return null;
+                          },
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                              color: const Color(0xFF4C7F7F),
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _obscurePassword = !_obscurePassword;
+                              });
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        _buildInputField(
+                          controller: _confirmPasswordController,
+                          labelText: 'تأكيد كلمة المرور',
+                          obscureText: _obscureConfirmPassword,
+                          validator: (value) {
+                            if (value != _passwordController.text) {
+                              return 'كلمة المرور غير متطابقة';
+                            }
+                            return null;
+                          },
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
+                              color: const Color(0xFF4C7F7F),
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _obscureConfirmPassword = !_obscureConfirmPassword;
+                              });
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        // زر التسجيل
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFE0BBE4), // لون خلفية الزر
+                            foregroundColor: Colors.white, // لون النص
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 15),
+                          ),
+                          onPressed: _onSignUp,
+                          child: state is AuthLoading
+                              ? const CircularProgressIndicator(
                                   color: Colors.white,
+                                )
+                              : const Text(
+                                  'SIGN UP',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
                                 ),
-                              ),
-                            );
-                    },
+                        ),
+                      ],
+                    ),
                   ),
-                ],
+                ),
               ),
-            ),
-          ),
+            );
+          },
         ),
       ),
     );
   }
 
-  // Helper function to build input fields
   Widget _buildInputField({
     required TextEditingController controller,
     required String labelText,

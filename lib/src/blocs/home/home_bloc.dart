@@ -1,3 +1,4 @@
+// lib/src/blocs/home/home_bloc.dart
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
@@ -9,7 +10,6 @@ part 'home_event.dart';
 part 'home_state.dart';
 
 class HomeBloc extends Bloc<HomeEvent, HomeState> {
-  // ignore: unused_field
   final AuthService _authService;
   final FirestoreService _firestoreService;
 
@@ -17,7 +17,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     on<LoadHomeData>((event, emit) async {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
-        emit(HomeError(message: 'User not authenticated.'));
+        emit(HomeError('User not authenticated.')); // ✅ تعديل هنا
         return;
       }
 
@@ -29,7 +29,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
           final institutionId = userData['institutionId'] as String?;
 
           if (institutionId == null) {
-            emit(HomeError(message: 'Institution ID not found.'));
+            emit(HomeError('Institution ID not found.')); // ✅ تعديل هنا
             return;
           }
 
@@ -42,6 +42,10 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
           final notifications = await _firestoreService.getNotifications(
             user.uid,
           );
+          // قم بإضافة هذا السطر بعد التأكد من وجود الدالة في firestore_service.dart
+          final int? totalTasksCount = await _firestoreService.getTasksCount(
+            institutionId,
+          );
 
           emit(
             HomeLoaded(
@@ -51,25 +55,25 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
               institutionId: institutionId,
               orphanSponsored: stats['orphanSponsored'] ?? 0,
               completedTasksPercentage:
-                  (stats['completedTasksPercentage'] ?? 0),
+                  (stats['completedTasksPercentage'] ?? 0.0).toDouble(),
               orphanRequiringUpdates: stats['orphanRequiringUpdates'] ?? 0,
               supervisorsCount: stats['supervisorsCount'] ?? 0,
               completedFieldVisits: stats['completedFieldVisits'] ?? 0,
               scheduledVisits: visits,
               notifications: notifications,
-              totalOrphans:
-                  (stats['orphanSponsored'] ?? 0) +
-                  (stats['orphanRequiringUpdates'] ?? 0),
-              completedTasks: (stats['completedTasksPercentage'] ?? 0.0)
-                  .toInt(),
-              totalVisits: stats['completedFieldVisits'] ?? 0,
+              totalOrphans: stats['totalOrphans'] ?? 0,
+              completedTasks: stats['completedTasks'] ?? 0,
+              totalVisits: stats['totalVisits'] ?? 0,
+              totalTasks: totalTasksCount ?? 0,
             ),
           );
         } else {
-          emit(HomeError(message: 'User data not found.'));
+          emit(HomeError('User data not found.')); // ✅ تعديل هنا
         }
-      } catch (e) {
-        emit(HomeError(message: 'Failed to load home data: $e'));
+      } catch (e, stackTrace) {
+        print('Error caught in HomeBloc: $e');
+        print('StackTrace: $stackTrace');
+        emit(HomeError('Failed to load home data: $e')); // ✅ تعديل هنا
       }
     });
   }

@@ -6,7 +6,6 @@ class FirestoreService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   // ========== Utils ==========
-  // ignore: unused_element
   String _generateCustomId() {
     final random = Random();
     const min = 10000000;
@@ -27,62 +26,63 @@ class FirestoreService {
   }
 
   void _ensureHasInstitutionId(Map<String, dynamic> data) {
-    if (data['institutionId'] == null || (data['institutionId'] as String).isEmpty) {
+    if (data['institutionId'] == null ||
+        (data['institutionId'] as String).isEmpty) {
       throw ArgumentError("institutionId is required on this operation.");
     }
   }
 
-  // ========== Institutions & Kafala Head ==========
-  /// إنشاء مؤسسة جديدة + إنشاء رئيس قسم الكفالة (بدون أي مشرف)
-  /// institutionId: يتم توليده خارجًا (مثلاً من Auth UID للمؤسسة) أو مسبقًا.
-  /// institutionData: name, email, phone, address, ... (من الفورم)
-  /// kafalaHeadData: uid, name, email, phone, ... (من Auth بعد التسجيل)
+// ========== Users ==========
+  Future<DocumentSnapshot?> getUser(String uid) async {
+    try {
+      final doc = await _firestore.collection('users').doc(uid).get();
+      return doc.exists ? doc : null;
+    } catch (e) {
+      print('Error getting user: $e');
+      return null;
+    }
+  }
+
+  Future<void> createUser(String uid, Map<String, dynamic> userData) async {
+    await _firestore.collection('users').doc(uid).set(userData);
+  }
+
+  // ========== Institutions ==========
   Future<void> initializeNewInstitution(
     String institutionId,
     Map<String, dynamic> institutionData,
     Map<String, dynamic> kafalaHeadData,
   ) async {
-    final institutionRef = _firestore.collection('institutions').doc(institutionId);
+    final institutionRef = _firestore
+        .collection('institutions')
+        .doc(institutionId);
     final kafalaHeadUid = kafalaHeadData['uid'] as String?;
-    if (kafalaHeadUid == null || kafalaHeadUid.isEmpty) {
-      throw ArgumentError("kafalaHeadData.uid is required");
-    }
-    final kafalaHeadRef = _firestore.collection('kafala_heads').doc(kafalaHeadUid);
+    
+    // إنشاء ملف المؤسسة
+    await institutionRef.set({
+      ...institutionData,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
 
-    await _firestore.runTransaction((tx) async {
-      tx.set(institutionRef, {
-        ...institutionData,
-        'institutionId': institutionId,
-        'createdAt': FieldValue.serverTimestamp(),
-        'status': 'active',
-      });
-
-      tx.set(kafalaHeadRef, {
+    // إنشاء ملف المستخدم (رئيس الكفالة) وربطه بالمؤسسة
+    if (kafalaHeadUid != null) {
+      await _firestore.collection('users').doc(kafalaHeadUid).set({
         ...kafalaHeadData,
         'institutionId': institutionId,
         'createdAt': FieldValue.serverTimestamp(),
-        'role': 'kafala_head',
-        'isActive': true,
       });
-    });
-  }
-
-  Future<Map<String, dynamic>?> getInstitution(String institutionId) async {
-    final snap = await _firestore.collection('institutions').doc(institutionId).get();
-    return snap.data();
-  }
-
-  Future<void> updateInstitution(String institutionId, Map<String, dynamic> update) async {
-    update['updatedAt'] = FieldValue.serverTimestamp();
-    await _firestore.collection('institutions').doc(institutionId).update(update);
+    }
   }
 
   // ========== Supervisors ==========
-  /// إنشاء مشرف جديد (يستدعيه فقط رئيس قسم الكفالة من الواجهة)
-  /// supervisorData: يجب أن يحتوي uid وبيانات المشرف الأساسية
-  Future<void> createSupervisor(String institutionId, Map<String, dynamic> supervisorData) async {
+  Future<void> createSupervisor(
+    String institutionId,
+    Map<String, dynamic> supervisorData,
+  ) async {
     final uid = supervisorData['uid'] as String?;
-    if (uid == null || uid.isEmpty) throw ArgumentError('supervisorData.uid is required');
+    if (uid == null || uid.isEmpty) {
+      throw ArgumentError('supervisorData.uid is required');
+    }
     final ref = _firestore.collection('supervisors').doc(uid);
 
     await ref.set({
@@ -94,7 +94,9 @@ class FirestoreService {
     });
   }
 
-  Future<List<Map<String, dynamic>>> listSupervisors(String institutionId) async {
+  Future<List<Map<String, dynamic>>> listSupervisors(
+    String institutionId,
+  ) async {
     final q = await _firestore
         .collection('supervisors')
         .where('institutionId', isEqualTo: institutionId)
@@ -103,8 +105,6 @@ class FirestoreService {
     return q.docs.map((d) => d.data()).toList();
   }
 
-  // ========== Auth-linked user fetch ==========
-  /// جلب بيانات المستخدم (رئيس كفالة أو مشرف) حسب uid
   Future<Map<String, dynamic>?> getUserData(String uid) async {
     final head = await _firestore.collection('kafala_heads').doc(uid).get();
     if (head.exists) return head.data();
@@ -112,77 +112,107 @@ class FirestoreService {
     if (sup.exists) return sup.data();
     return null;
   }
-
-  // ========== Dashboard ==========
-  /// تُرجع أرقام لوحة التحكم (num تدعم int و double)
-  Future<Map<String, int>> getDashboardStats(String institutionId) async {
+ 
+  Future<int?> getTasksCount(String institutionId) async {
     try {
-      final orphansCount = await _firestore
-          .collection('orphans')
-          .where('institutionId', isEqualTo: institutionId)
-          .count()
-          .get();
-
-      final supervisorsCount = await _firestore
-          .collection('supervisors')
-          .where('institutionId', isEqualTo: institutionId)
-          .count()
-          .get();
-
-      final completedTasks = await _firestore
-          .collection('tasks')
-          .where('institutionId', isEqualTo: institutionId)
-          .where('status', isEqualTo: 'completed')
-          .count()
-          .get();
-
-      final totalTasks = await _firestore
+      final querySnapshot = await _firestore
           .collection('tasks')
           .where('institutionId', isEqualTo: institutionId)
           .count()
           .get();
-
-      int completedTasksPercentage = 0;
-      final total = (totalTasks.count ?? 0);
-      if (total > 0) {
-        completedTasksPercentage = (((completedTasks.count ?? 0) / total) * 100).round();
-      }
-
-      final orphansNeedingUpdates = await _firestore
-          .collection('orphans')
-          .where('institutionId', isEqualTo: institutionId)
-          .where('isDataComplete', isEqualTo: false)
-          .count()
-          .get();
-
-      final completedVisits = await _firestore
-          .collection('field_visits')
-          .where('institutionId', isEqualTo: institutionId)
-          .where('status', isEqualTo: 'completed')
-          .count()
-          .get();
-
-      return {
-        'orphanSponsored': orphansCount.count ?? 0,
-        'completedTasksPercentage': completedTasksPercentage,
-        'orphanRequiringUpdates': orphansNeedingUpdates.count ?? 0,
-        'supervisorsCount': supervisorsCount.count ?? 0,
-        'completedFieldVisits': completedVisits.count ?? 0,
-      };
+      return querySnapshot.count;
     } catch (e) {
-      print('Error getting dashboard stats: $e');
-      return {
-        'orphanSponsored': 0,
-        'completedTasksPercentage': 0,
-        'orphanRequiringUpdates': 0,
-        'supervisorsCount': 0,
-        'completedFieldVisits': 0,
-      };
+      print('Error getting tasks count: $e');
+      return 0;
     }
+  }
+  // ==========  ==========\
+  Future<Map<String, dynamic>> getDashboardStats(String institutionId) async {
+    return _firestore.runTransaction<Map<String, dynamic>>((tx) async {
+      // Queries for counts
+      final totalOrphansQuery = _firestore
+          .collection('orphans')
+          .where('institutionId', isEqualTo: institutionId)
+          .where('isArchived', isEqualTo: false);
+      final orphanSponsoredQuery = totalOrphansQuery.where(
+        'isSponsored',
+        isEqualTo: true,
+      );
+      final orphanRequiringUpdatesQuery = totalOrphansQuery.where(
+        'isRequiringUpdates',
+        isEqualTo: true,
+      );
+      final supervisorsCountQuery = _firestore
+          .collection('users')
+          .where('institutionId', isEqualTo: institutionId)
+          .where('role', isEqualTo: 'supervisor');
+      final completedTasksQuery = _firestore
+          .collection('tasks')
+          .where('institutionId', isEqualTo: institutionId)
+          .where('status', isEqualTo: 'completed');
+      final totalTasksQuery = _firestore
+          .collection('tasks')
+          .where('institutionId', isEqualTo: institutionId);
+      final totalVisitsQuery = _firestore
+          .collection('field_visits')
+          .where('institutionId', isEqualTo: institutionId);
+      final completedFieldVisitsQuery = totalVisitsQuery.where(
+        'status',
+        isEqualTo: 'completed',
+      );
+
+      // Fetch counts
+      final totalOrphansSnapshot = await totalOrphansQuery.count().get();
+      final orphanSponsoredSnapshot = await orphanSponsoredQuery.count().get();
+      final orphanRequiringUpdatesSnapshot = await orphanRequiringUpdatesQuery
+          .count()
+          .get();
+      final supervisorsCountSnapshot = await supervisorsCountQuery
+          .count()
+          .get();
+      final completedTasksSnapshot = await completedTasksQuery.count().get();
+      final totalTasksSnapshot = await totalTasksQuery.count().get();
+      final totalVisitsSnapshot = await totalVisitsQuery.count().get();
+      final completedFieldVisitsSnapshot = await completedFieldVisitsQuery
+          .count()
+          .get();
+
+      // Get the count values
+      final totalOrphans = totalOrphansSnapshot.count;
+      final orphanSponsored = orphanSponsoredSnapshot.count;
+      final orphanRequiringUpdates = orphanRequiringUpdatesSnapshot.count;
+      final supervisorsCount = supervisorsCountSnapshot.count;
+      final completedTasks = completedTasksSnapshot.count;
+      final totalTasks = totalTasksSnapshot.count;
+      final totalVisits = totalVisitsSnapshot.count;
+      final completedFieldVisits = completedFieldVisitsSnapshot.count;
+
+      // Calculate percentages
+      final completedTasksPercentage = totalTasks! > 0
+          ? (completedTasks! / totalTasks) * 100
+          : 0.0;
+
+      final Map<String, dynamic> stats = {
+        'totalOrphans': totalOrphans,
+        'orphanSponsored': orphanSponsored,
+        'orphanRequiringUpdates': orphanRequiringUpdates,
+        'supervisorsCount': supervisorsCount,
+        'completedTasks': completedTasks,
+        'completedTasksPercentage': completedTasksPercentage,
+        'totalVisits': totalVisits,
+        'completedFieldVisits': completedFieldVisits,
+        'totalTasks': totalTasks, // Added for completeness
+      };
+
+      print('FirestoreService: Fetched Stats: $stats');
+      return stats;
+    });
   }
 
   // ========== Field Visits ==========
-  Future<List<Map<String, dynamic>>> getScheduledVisits(String institutionId) async {
+  Future<List<Map<String, dynamic>>> getScheduledVisits(
+    String institutionId,
+  ) async {
     try {
       final qs = await _firestore
           .collection('field_visits')
@@ -252,7 +282,10 @@ class FirestoreService {
     });
   }
 
-  Future<void> markNotificationRead(String notificationId, {bool isRead = true}) async {
+  Future<void> markNotificationRead(
+    String notificationId, {
+    bool isRead = true,
+  }) async {
     await _firestore.collection('notifications').doc(notificationId).update({
       'isRead': isRead,
       'readAt': FieldValue.serverTimestamp(),
@@ -262,15 +295,74 @@ class FirestoreService {
   // ========== Orphans ==========
   Query getOrphansQuery({
     required String institutionId,
-    bool showIncomplete = false,
+    String? searchTerm,
+    String? gender,
+    bool includeArchived = false,
+    DateTime? minBirthDate,
+    DateTime? maxBirthDate,
+    DateTime? minDeathDate,
+    DateTime? maxDeathDate,
+    double? minKafala,
+    double? maxKafala,
+    bool onlyIncomplete = false,
   }) {
     Query query = _firestore
         .collection('orphans')
         .where('institutionId', isEqualTo: institutionId);
 
-    if (showIncomplete) {
+    if (!includeArchived) {
+      query = query.where('isArchived', isEqualTo: false);
+    }
+
+    if (onlyIncomplete) {
       query = query.where('isDataComplete', isEqualTo: false);
     }
+
+    if (gender != null && gender.isNotEmpty) {
+      query = query.where('gender', isEqualTo: gender);
+    }
+
+    if (minBirthDate != null) {
+      query = query.where(
+        'dateOfBirth',
+        isGreaterThanOrEqualTo: Timestamp.fromDate(minBirthDate),
+      );
+    }
+    if (maxBirthDate != null) {
+      query = query.where(
+        'dateOfBirth',
+        isLessThanOrEqualTo: Timestamp.fromDate(maxBirthDate),
+      );
+    }
+
+    if (minDeathDate != null) {
+      query = query.where(
+        'dateOfDeath',
+        isGreaterThanOrEqualTo: Timestamp.fromDate(minDeathDate),
+      );
+    }
+    if (maxDeathDate != null) {
+      query = query.where(
+        'dateOfDeath',
+        isLessThanOrEqualTo: Timestamp.fromDate(maxDeathDate),
+      );
+    }
+
+    if (minKafala != null) {
+      query = query.where('kafalaAmount', isGreaterThanOrEqualTo: minKafala);
+    }
+    if (maxKafala != null) {
+      query = query.where('kafalaAmount', isLessThanOrEqualTo: maxKafala);
+    }
+
+    if (searchTerm != null && searchTerm.isNotEmpty) {
+      // البحث المتقدم: الاسم، رقم اليتيم، رقم الهوية، اسم المتوفى، اسم المعيل
+      query = query.where(
+        'searchKeywords',
+        arrayContains: searchTerm.toLowerCase(),
+      );
+    }
+
     return query.orderBy('createdAt', descending: true);
   }
 
@@ -279,6 +371,22 @@ class FirestoreService {
       _ensureHasInstitutionId(orphanData);
       final ref = _firestore.collection('orphans').doc();
       final id = ref.id;
+
+      // توليد مصفوفة Keywords للبحث المتقدم
+      List<String> keywords = [];
+      if (orphanData['name'] != null) {
+        keywords.addAll(_generateSearchKeywords(orphanData['name']));
+      }
+      if (orphanData['orphanIdNumber'] != null) {
+        keywords.add(orphanData['orphanIdNumber'].toString());
+      }
+      if (orphanData['deceasedName'] != null) {
+        keywords.addAll(_generateSearchKeywords(orphanData['deceasedName']));
+      }
+      if (orphanData['breadwinnerName'] != null) {
+        keywords.addAll(_generateSearchKeywords(orphanData['breadwinnerName']));
+      }
+      orphanData['searchKeywords'] = keywords;
 
       await ref.set({
         ...orphanData,
@@ -294,9 +402,35 @@ class FirestoreService {
     }
   }
 
-  Future<bool> updateOrphan(String orphanId, Map<String, dynamic> updateData) async {
+  Future<bool> updateOrphan(
+    String orphanId,
+    Map<String, dynamic> updateData,
+  ) async {
     try {
       updateData['updatedAt'] = FieldValue.serverTimestamp();
+
+      if (updateData.containsKey('name') ||
+          updateData.containsKey('orphanIdNumber') ||
+          updateData.containsKey('deceasedName') ||
+          updateData.containsKey('breadwinnerName')) {
+        List<String> keywords = [];
+        if (updateData['name'] != null) {
+          keywords.addAll(_generateSearchKeywords(updateData['name']));
+        }
+        if (updateData['orphanIdNumber'] != null) {
+          keywords.add(updateData['orphanIdNumber'].toString());
+        }
+        if (updateData['deceasedName'] != null) {
+          keywords.addAll(_generateSearchKeywords(updateData['deceasedName']));
+        }
+        if (updateData['breadwinnerName'] != null) {
+          keywords.addAll(
+            _generateSearchKeywords(updateData['breadwinnerName']),
+          );
+        }
+        updateData['searchKeywords'] = keywords;
+      }
+
       await _firestore.collection('orphans').doc(orphanId).update(updateData);
       return true;
     } catch (e) {
@@ -326,6 +460,18 @@ class FirestoreService {
       print('Error getting orphan data: $e');
       return null;
     }
+  }
+
+  // ========== Helpers ==========
+  List<String> _generateSearchKeywords(String text) {
+    final List<String> keywords = [];
+    final parts = text.toLowerCase().split(' ');
+    String current = '';
+    for (var part in parts) {
+      current = current.isEmpty ? part : '$current $part';
+      keywords.add(current);
+    }
+    return keywords;
   }
 
   // ========== Tasks ==========
@@ -366,11 +512,15 @@ class FirestoreService {
     String? status, // 'pending' | 'in_progress' | 'completed'
     String? assignedToUid,
   }) {
-    Query q = _firestore.collection('tasks').where('institutionId', isEqualTo: institutionId);
+    Query q = _firestore
+        .collection('tasks')
+        .where('institutionId', isEqualTo: institutionId);
     if (status != null) q = q.where('status', isEqualTo: status);
-    if (assignedToUid != null) q = q.where('assignedTo', isEqualTo: assignedToUid);
-    return q.orderBy('createdAt', descending: true);
+    if (assignedToUid != null) {
+      q = q.where('assignedTo', isEqualTo: assignedToUid);
     }
+    return q.orderBy('createdAt', descending: true);
+  }
 
   // ========== SMS Logs ==========
   Future<bool> sendSMS(Map<String, dynamic> smsData) async {

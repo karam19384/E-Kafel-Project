@@ -108,13 +108,13 @@ class AppDrawer extends StatelessWidget {
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => const AddNewOrphanScreen(),
+                  builder: (context) => AddNewOrphanScreen(institutionId: ''),
                 ),
               );
             },
           ),
           _buildDrawerItem(
-            icon: Icons.person_add,
+            icon: Icons.person_add_alt_1,
             text: 'Add new Supervisor',
             onTap: () {}, // أضف التنقل لاحقًا
           ),

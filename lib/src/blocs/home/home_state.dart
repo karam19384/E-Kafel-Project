@@ -1,3 +1,4 @@
+// lib/src/blocs/home/home_state.dart
 part of 'home_bloc.dart';
 
 @immutable
@@ -24,11 +25,10 @@ class HomeLoaded extends HomeState {
   final int completedFieldVisits;
   final List<Map<String, dynamic>> scheduledVisits;
   final List<Map<String, dynamic>> notifications;
-  
-  // الخصائص الجديدة
   final int totalOrphans;
   final int completedTasks;
   final int totalVisits;
+  final int totalTasks; // ✅ إضافة حقل totalTasks هنا
 
   const HomeLoaded({
     required this.userName,
@@ -45,6 +45,7 @@ class HomeLoaded extends HomeState {
     required this.totalOrphans,
     required this.completedTasks,
     required this.totalVisits,
+    required this.totalTasks, // ✅ وإضافته هنا
   });
 
   @override
@@ -63,13 +64,14 @@ class HomeLoaded extends HomeState {
         totalOrphans,
         completedTasks,
         totalVisits,
+        totalTasks, // ✅ وإضافته هنا
       ];
 }
 
 class HomeError extends HomeState {
-  final String message;
+  final  String message ;
 
-  const HomeError({required this.message});
+  const HomeError(this.message);
 
   @override
   List<Object> get props => [message];

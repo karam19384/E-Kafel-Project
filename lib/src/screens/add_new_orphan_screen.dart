@@ -1,19 +1,21 @@
-// ignore_for_file: unused_local_variable, library_private_types_in_public_api
+// ignore_for_file: unused_local_variable
 
 import 'dart:io';
-import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:provider/provider.dart';
-import 'package:e_kafel/src/models/orphan.dart';
-import 'package:e_kafel/src/providers/orphan_provider.dart';
+import 'package:e_kafel/src/models/orphan_model.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../blocs/orphans/orphans_bloc.dart';
+import 'package:intl/intl.dart';
+import '../blocs/home/home_bloc.dart'; // ✅ تم استيراد HomeBloc
 
 class AddNewOrphanScreen extends StatefulWidget {
   static const routeName = '/add-orphan';
 
-  const AddNewOrphanScreen({super.key});
+  final String institutionId;
+
+  const AddNewOrphanScreen({super.key, required this.institutionId});
 
   @override
   _AddNewOrphanScreenState createState() => _AddNewOrphanScreenState();
@@ -23,613 +25,637 @@ class _AddNewOrphanScreenState extends State<AddNewOrphanScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
 
+  String? _deathDateErrorText;
+  String? _birthDateErrorText;
+
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _deceasedNameController = TextEditingController();
+  final TextEditingController _deceasedIdNumberController = TextEditingController();
+  final TextEditingController _orphanIdNumberController = TextEditingController();
+  final TextEditingController _motherIdNumberController = TextEditingController();
+  final TextEditingController _motherNameController = TextEditingController();
+  final TextEditingController _breadwinnerIdNumberController = TextEditingController();
+  final TextEditingController _breadwinnerNameController = TextEditingController();
+  final TextEditingController _neighborhoodController = TextEditingController();
+  final TextEditingController _numberOfMalesController = TextEditingController();
+  final TextEditingController _numberOfFemalesController = TextEditingController();
+  final TextEditingController _totalFamilyMembersController = TextEditingController();
+  final TextEditingController _mobileNumberController = TextEditingController();
+  final TextEditingController _phoneNumberController = TextEditingController();
+  final TextEditingController _schoolNameController = TextEditingController();
+  final TextEditingController _gradeController = TextEditingController();
+  final TextEditingController _educationLevelController = TextEditingController();
+
   // القوائم المنسدلة
-  String? _selectedGender;
-  String? _selectedMaritalStatus;
-  String? _selectedKinship;
+  String? _selectedCauseOfDeath = 'استشهاد';
+  String? _selectedGender = 'ذكر';
+  String? _selectedMaritalStatus = 'أرمل/ة';
+  String? _selectedKinship = 'الأم';
   String? _selectedGovernorate;
   String? _selectedCity;
 
-  // الملفات
+ // قائمة المحافظات والمدن
+  final Map<String, List<String>> _governoratesAndCities = {
+    'غزة': ['الشجاعية', 'الزيتون', 'التفاح', 'الدرج','النصر','الرمال','تل الهوا','الشاطئ','الجلاء','الشيخ رضوان'],
+    'شمال غزة': ['الكرامة',' جباليا البلد', 'بيت لاهيا', 'بيت حانون','الصفطاوي','التوام','مشروع بيت لاهيا','العطاطرة'],
+    'خان يونس': [' خان يونس البلد', 'عبسان الكبيرة', 'عبسان الصغيرة', 'بني سهيلا','الفخاري','المنارة','معن','مدينة حمد'],
+    'رفح': ['رفح', 'الشوكة', 'الزوارعة','النجمة','العودة','حي السلام','الحي البرازيلي','الحي السعودي'],
+    'المنطقة الوسطى': ['دير البلح', 'النصيرات', 'البريج', 'المغازي','المصدر'],
+  };
+
   File? _idCardFile;
   File? _deathCertificateFile;
   File? _orphanPhotoFile;
-  // ignore: unused_field
-  final ImagePicker _picker = ImagePicker();
+  Uint8List? _idCardBytes;
+  Uint8List? _deathCertificateBytes;
+  Uint8List? _orphanPhotoBytes;
 
-  // Controllers لكل الحقول النصية
-  final _nameController = TextEditingController();
-  final _deceasedNameController = TextEditingController();
-  final _causeOfDeathController = TextEditingController();
-  final _deceasedIdController = TextEditingController();
-  final _orphanIdController = TextEditingController();
-  final _motherIdController = TextEditingController();
-  final _motherNameController = TextEditingController();
-  final _breadwinnerIdController = TextEditingController();
-  final _breadwinnerNameController = TextEditingController();
-  final _malesCountController = TextEditingController();
-  final _femalesCountController = TextEditingController();
-  final _totalMembersController = TextEditingController();
-  final _mobileController = TextEditingController();
-  final _phoneController = TextEditingController();
-  final _schoolNameController = TextEditingController();
-  final _gradeController = TextEditingController();
-  final _educationLevelController = TextEditingController();
-  final _neighborhoodController = TextEditingController();
-
-  // التواريخ
   DateTime? _dateOfDeath;
-  DateTime? _orphanDateOfBirth;
+  DateTime? _dateOfBirth;
+
+  @override
+  void initState() {
+    super.initState();
+    _motherNameController.addListener(_updateBreadwinnerName);
+    _motherIdNumberController.addListener(_updateBreadwinnerId);
+  }
+
+  void _updateBreadwinnerName() {
+    setState(() {
+      _breadwinnerNameController.text = _motherNameController.text;
+    });
+  }
+
+  void _updateBreadwinnerId() {
+    setState(() {
+      _breadwinnerIdNumberController.text = _motherIdNumberController.text;
+    });
+  }
 
   @override
   void dispose() {
-    // تنظيف جميع الـ Controllers
     _nameController.dispose();
     _deceasedNameController.dispose();
-    _causeOfDeathController.dispose();
-    _deceasedIdController.dispose();
-    _orphanIdController.dispose();
-    _motherIdController.dispose();
+    _deceasedIdNumberController.dispose();
+    _orphanIdNumberController.dispose();
+    _motherIdNumberController.dispose();
     _motherNameController.dispose();
-    _breadwinnerIdController.dispose();
+    _breadwinnerIdNumberController.dispose();
     _breadwinnerNameController.dispose();
-    _malesCountController.dispose();
-    _femalesCountController.dispose();
-    _totalMembersController.dispose();
-    _mobileController.dispose();
-    _phoneController.dispose();
+    _neighborhoodController.dispose();
+    _numberOfMalesController.dispose();
+    _numberOfFemalesController.dispose();
+    _totalFamilyMembersController.dispose();
+    _mobileNumberController.dispose();
+    _phoneNumberController.dispose();
     _schoolNameController.dispose();
     _gradeController.dispose();
     _educationLevelController.dispose();
-    _neighborhoodController.dispose();
     super.dispose();
   }
 
-  Future<void> _pickFile(bool isIdCard, bool isOrphanPhoto) async {
-    try {
-      FilePickerResult? result = await FilePicker.platform.pickFiles(
-        type: FileType.image, // يمكنك تحديد نوع الملف كصور فقط
-      );
-
-      if (result != null) {
-        if (kIsWeb) {
-          Uint8List? fileBytes = result.files.first.bytes;
-          String? fileName = result.files.first.name;
-
-          if (kDebugMode) {
-            print('Web file name: $fileName');
-          }
-        } else {
-          // إذا كان التطبيق يعمل على الأندرويد أو iOS
-          File file = File(result.files.first.path!);
-
-          // الآن يمكنك استخدام file لرفع الملف
-          // ...
-          if (kDebugMode) {
-            print('Mobile file path: ${file.path}');
-          }
-
-          setState(() {
-            if (isOrphanPhoto) {
-              _orphanPhotoFile = file;
-            } else if (isIdCard) {
-              _idCardFile = file;
-            } else {
-              _deathCertificateFile = file;
-            }
-          });
-        }
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('فشل في اختيار الملف: $e')));
-    }
-  }
-
-  Future<void> _selectDate(BuildContext context, bool isDateOfDeath) async {
+  Future<void> _selectDate(BuildContext context, {required bool isDateOfBirth}) async {
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: DateTime.now(),
-      firstDate: DateTime(1900),
-      lastDate: DateTime.now(),
+      initialDate: isDateOfBirth ? DateTime.now() :_dateOfDeath ?? DateTime.now(),
+      firstDate: isDateOfBirth ? DateTime(DateTime.now().year - 18)  : DateTime(2000),
+      lastDate:  DateTime.now() ,
     );
     if (picked != null) {
       setState(() {
-        if (isDateOfDeath) {
-          _dateOfDeath = picked;
+        if (isDateOfBirth) {
+          _dateOfBirth = picked;
+          _birthDateErrorText = null; //  إزالة رسالة الخطأ عند اختيار التاريخ صح
         } else {
-          _orphanDateOfBirth = picked;
+          _dateOfDeath = picked;
+          _deathDateErrorText = null; //  إزالة رسالة الخطأ عند اختيار التاريخ صح
         }
       });
     }
   }
 
-  Future<void> _submitForm() async {
+  void _onSave() {
     if (!_formKey.currentState!.validate()) {
       return;
     }
 
-    setState(() {
+    if (_dateOfDeath == null) {
+      setState(() {
+        _deathDateErrorText = 'الرجاء إدخال تاريخ الوفاة';
+      });
+      return;
+    }
+    if (_dateOfBirth == null) {
+      setState(() {
+        _birthDateErrorText = 'الرجاء إدخال تاريخ الميلاد';
+      });
+      return;
+    }
+
+        setState(() {
       _isLoading = true;
     });
 
-    try {
-      String orphanNo = (100000 + Random().nextInt(900000)).toString();
-      Orphan newOrphan = Orphan(
-        name: _nameController.text,
-        deceasedName: _deceasedNameController.text,
-        causeOfDeath: _causeOfDeathController.text,
-        dateOfDeath: _dateOfDeath,
-        deceasedIdNumber: _deceasedIdController.text,
-        gender: _selectedGender,
-        orphanIdNumber: _orphanIdController.text,
-        dateOfBirth: _orphanDateOfBirth,
-        motherIdNumber: _motherIdController.text,
-        motherName: _motherNameController.text,
-        breadwinnerIdNumber: _breadwinnerIdController.text,
-        breadwinnerName: _breadwinnerNameController.text,
-        breadwinnerMaritalStatus: _selectedMaritalStatus,
-        breadwinnerKinship: _selectedKinship,
-        governorate: _selectedGovernorate,
-        city: _selectedCity,
-        neighborhood: _neighborhoodController.text,
-        numberOfMales: int.tryParse(_malesCountController.text) ?? 0,
-        numberOfFemales: int.tryParse(_femalesCountController.text) ?? 0,
-        totalFamilyMembers: int.tryParse(_totalMembersController.text) ?? 0,
-        mobileNumber: _mobileController.text,
-        phoneNumber: _phoneController.text,
-        orphanNo: orphanNo,
-        schoolName: _schoolNameController.text,
-        grade: _gradeController.text,
-        educationLevel: _educationLevelController.text,
-        idCardUrl: null,
-        deathCertificateUrl: null,
-        orphanPhotoUrl: null,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      );
+    final orphan = Orphan(
+      institutionId: widget.institutionId,
+      name: _nameController.text,
+      deceasedName: _deceasedNameController.text,
+      causeOfDeath: _selectedCauseOfDeath,
+      dateOfDeath: _dateOfDeath,
+      deceasedIdNumber: _deceasedIdNumberController.text,
+      gender: _selectedGender,
+      orphanIdNumber: _orphanIdNumberController.text,
+      dateOfBirth: _dateOfBirth,
+      motherIdNumber: _motherIdNumberController.text,
+      motherName: _motherNameController.text,
+      breadwinnerIdNumber: _breadwinnerIdNumberController.text,
+      breadwinnerName: _breadwinnerNameController.text,
+      breadwinnerMaritalStatus: _selectedMaritalStatus,
+      breadwinnerKinship: _selectedKinship,
+      governorate: _selectedGovernorate,
+      city: _selectedCity,
+      neighborhood: _neighborhoodController.text,
+      numberOfMales: int.tryParse(_numberOfMalesController.text) ?? 0,
+      numberOfFemales: int.tryParse(_numberOfFemalesController.text) ?? 0,
+      totalFamilyMembers: int.tryParse(_totalFamilyMembersController.text) ?? 0,
+      mobileNumber: _mobileNumberController.text,
+      phoneNumber: _phoneNumberController.text,
+      orphanNo: '', // سيتم توليده تلقائياً
+      schoolName: _schoolNameController.text,
+      grade: _gradeController.text,
+      educationLevel: _educationLevelController.text,
+      idCardUrl: null,
+      deathCertificateUrl: null,
+      orphanPhotoUrl: null,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
 
-      await Provider.of<OrphanProvider>(context, listen: false).addOrphan(
-        newOrphan,
-        _idCardFile,
-        _deathCertificateFile,
-        _orphanPhotoFile,
-      );
-
-      Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('تمت إضافة اليتيم بنجاح'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    } catch (error) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('فشل في الإضافة: $error'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
+    context.read<OrphansBloc>().add(
+          AddOrphan(
+            orphan: orphan,
+            idCardFile: _idCardFile,
+            deathCertificateFile: _deathCertificateFile,
+            orphanPhotoFile: _orphanPhotoFile,
+            idCardBytes: _idCardBytes,
+            deathCertificateBytes: _deathCertificateBytes,
+            orphanPhotoBytes: _orphanPhotoBytes,
+          ),
+        );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('إضافة يتيم جديد'),
-        actions: [
-          IconButton(
-            onPressed: _isLoading ? null : _submitForm,
-            icon: _isLoading
-                ? CircularProgressIndicator(color: Colors.white)
-                : Icon(Icons.save),
-          ),
-        ],
-      ),
-      body: _isLoading
-          ? Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Form(
-                key: _formKey,
-                child: ListView(
+    return BlocListener<OrphansBloc, OrphansState>(
+      listener: (context, state) {
+        if (state is OrphanAdded) {
+          setState(() {
+            _isLoading = false;
+          });
+          showDialog(
+            context: context,
+            builder: (BuildContext context) {
+              return AlertDialog(
+                title: const Center(
+                  child: Text(
+                    'تمت الإضافة بنجاح',
+                    style: TextStyle(
+                      color: Color(0xFF6DAF97),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                content: const Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    // القسم 1: المعلومات الأساسية
-                    Text(
-                      'المعلومات الأساسية',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    Text('تمت إضافة اليتيم بنجاح.', textAlign: TextAlign.center),
+                    SizedBox(height: 16),
+                    Icon(
+                      Icons.check_circle_outline,
+                      color: Color(0xFF6DAF97),
+                      size: 60,
                     ),
-                    SizedBox(height: 10),
-                    _buildFilePicker(
-                      label: 'صورة شخصية لليتيم',
-                      file: _orphanPhotoFile,
-                      onPressed: () => _pickFile(false, true),
-                    ),
-                    _buildTextFormField(
-                      controller: _nameController,
-                      labelText: 'الاسم الرباعي لليتيم',
-                      validator: (value) =>
-                          value!.isEmpty ? 'هذا الحقل مطلوب' : null,
-                    ),
-                    _buildDropdown(
-                      value: _selectedGender,
-                      items: ['ذكر', 'أنثى'],
-                      hint: 'اختر الجنس',
-                      label: 'الجنس',
-                      onChanged: (value) =>
-                          setState(() => _selectedGender = value),
-                      validator: (value) =>
-                          value == null ? 'هذا الحقل مطلوب' : null,
-                    ),
-                    _buildTextFormField(
-                      controller: _orphanIdController,
-                      labelText: 'رقم هوية اليتيم',
-                      keyboardType: TextInputType.number,
-                    ),
-                    _buildDateField(
-                      date: _orphanDateOfBirth,
-                      label: 'تاريخ ميلاد اليتيم',
-                      onTap: () => _selectDate(context, false),
-                    ),
-
-                    // القسم 2: معلومات المتوفى
-                    SizedBox(height: 20),
-                    Text(
-                      'معلومات المتوفى',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    SizedBox(height: 10),
-                    _buildTextFormField(
-                      controller: _deceasedNameController,
-                      labelText: 'الاسم الرباعي للمتوفى',
-                      validator: (value) =>
-                          value!.isEmpty ? 'هذا الحقل مطلوب' : null,
-                    ),
-                    _buildTextFormField(
-                      controller: _causeOfDeathController,
-                      labelText: 'سبب الوفاة',
-                    ),
-                    _buildDateField(
-                      date: _dateOfDeath,
-                      label: 'تاريخ الوفاة',
-                      onTap: () => _selectDate(context, true),
-                    ),
-                    _buildTextFormField(
-                      controller: _deceasedIdController,
-                      labelText: 'رقم هوية المتوفى',
-                      keyboardType: TextInputType.number,
-                    ),
-
-                    // القسم 3: معلومات الأم
-                    SizedBox(height: 20),
-                    Text(
-                      'معلومات الأم',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    SizedBox(height: 10),
-                    _buildTextFormField(
-                      controller: _motherNameController,
-                      labelText: 'اسم الأم',
-                    ),
-                    _buildTextFormField(
-                      controller: _motherIdController,
-                      labelText: 'رقم هوية الأم',
-                      keyboardType: TextInputType.number,
-                    ),
-
-                    // القسم 4: معلومات المعيل
-                    SizedBox(height: 20),
-                    Text(
-                      'معلومات المعيل',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    SizedBox(height: 10),
-                    _buildTextFormField(
-                      controller: _breadwinnerNameController,
-                      labelText: 'اسم المعيل',
-                    ),
-                    _buildTextFormField(
-                      controller: _breadwinnerIdController,
-                      labelText: 'رقم هوية المعيل',
-                      keyboardType: TextInputType.number,
-                    ),
-                    _buildDropdown(
-                      value: _selectedMaritalStatus,
-                      items: ['أعزب', 'متزوج', 'مطلق', 'أرمل'],
-                      hint: 'الحالة الاجتماعية',
-                      label: 'الحالة الاجتماعية للمعيل',
-                      onChanged: (value) =>
-                          setState(() => _selectedMaritalStatus = value),
-                    ),
-                    _buildDropdown(
-                      value: _selectedKinship,
-                      items: [
-                        'أب',
-                        'أم',
-                        'جد',
-                        'جدة',
-                        'عم',
-                        'عمة',
-                        'خال',
-                        'خالة',
-                        'أخ',
-                        'أخت',
-                      ],
-                      hint: 'صلة القرابة',
-                      label: 'صلة القرابة باليتيم',
-                      onChanged: (value) =>
-                          setState(() => _selectedKinship = value),
-                    ),
-
-                    // القسم 5: العنوان
-                    SizedBox(height: 20),
-                    Text(
-                      'العنوان',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    SizedBox(height: 10),
-                    _buildDropdown(
-                      value: _selectedGovernorate,
-                      items: ['شمال غزة', 'غزة', 'الوسطى', 'خانيونس', 'رفح'],
-                      hint: 'اختر المحافظة',
-                      label: 'المحافظة',
-                      onChanged: (value) =>
-                          setState(() => _selectedGovernorate = value),
-                      validator: (value) =>
-                          value == null ? 'هذا الحقل مطلوب' : null,
-                    ),
-                    _buildDropdown(
-                      value: _selectedCity,
-                      items: [
-                        'غزة',
-                        'جباليا',
-                        'بيت لاهيا',
-                        'بيت حانون',
-                        'دير البلح',
-                        'خزاعة',
-                        'عبسان',
-                        'رفح',
-                      ],
-                      hint: 'اختر المدينة/البلدية',
-                      label: 'المدينة/البلدية',
-                      onChanged: (value) =>
-                          setState(() => _selectedCity = value),
-                    ),
-                    _buildTextFormField(
-                      controller: _neighborhoodController,
-                      labelText: 'الحي/المنطقة',
-                    ),
-
-                    // القسم 6: معلومات العائلة
-                    SizedBox(height: 20),
-                    Text(
-                      'معلومات العائلة',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    SizedBox(height: 10),
-                    _buildTextFormField(
-                      controller: _malesCountController,
-                      labelText: 'عدد الذكور',
-                      keyboardType: TextInputType.number,
-                      validator: (value) {
-                        if (value == null || value.isEmpty)
-                          return 'هذا الحقل مطلوب';
-                        if (int.tryParse(value) == null)
-                          return 'أدخل رقمًا صحيحًا';
-                        return null;
-                      },
-                    ),
-                    _buildTextFormField(
-                      controller: _femalesCountController,
-                      labelText: 'عدد الإناث',
-                      keyboardType: TextInputType.number,
-                      validator: (value) {
-                        if (value == null || value.isEmpty)
-                          return 'هذا الحقل مطلوب';
-                        if (int.tryParse(value) == null)
-                          return 'أدخل رقمًا صحيحًا';
-                        return null;
-                      },
-                    ),
-                    _buildTextFormField(
-                      controller: _totalMembersController,
-                      labelText: 'إجمالي أفراد الأسرة',
-                      keyboardType: TextInputType.number,
-                      validator: (value) {
-                        if (value == null || value.isEmpty)
-                          return 'هذا الحقل مطلوب';
-                        if (int.tryParse(value) == null)
-                          return 'أدخل رقمًا صحيحًا';
-                        return null;
-                      },
-                    ),
-
-                    // القسم 7: الاتصال
-                    SizedBox(height: 20),
-                    Text(
-                      'معلومات الاتصال',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    SizedBox(height: 10),
-                    _buildTextFormField(
-                      controller: _mobileController,
-                      labelText: 'رقم الجوال',
-                      keyboardType: TextInputType.phone,
-                    ),
-                    _buildTextFormField(
-                      controller: _phoneController,
-                      labelText: 'رقم الهاتف',
-                      keyboardType: TextInputType.phone,
-                    ),
-
-                    // القسم 8: التعليم
-                    SizedBox(height: 20),
-                    Text(
-                      'معلومات التعليم',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    SizedBox(height: 10),
-                    _buildTextFormField(
-                      controller: _schoolNameController,
-                      labelText: 'اسم المدرسة',
-                    ),
-                    _buildTextFormField(
-                      controller: _gradeController,
-                      labelText: 'الصف',
-                    ),
-                    _buildTextFormField(
-                      controller: _educationLevelController,
-                      labelText: 'المستوى التعليمي',
-                    ),
-
-                    // القسم 9: المستندات
-                    SizedBox(height: 20),
-                    Text(
-                      'المستندات المطلوبة',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    SizedBox(height: 10),
-                    _buildFilePicker(
-                      label: 'صورة هوية المعيل',
-                      file: _idCardFile,
-                      onPressed: () => _pickFile(true, false),
-                    ),
-                    _buildFilePicker(
-                      label: 'شهادة الوفاة',
-                      file: _deathCertificateFile,
-                      onPressed: () => _pickFile(false, false),
-                    ),
-
-                    // زر الحفظ
-                    SizedBox(height: 20),
-                    ElevatedButton(
-                      onPressed: _isLoading ? null : _submitForm,
-                      style: ElevatedButton.styleFrom(
-                        padding: EdgeInsets.symmetric(vertical: 16),
-                      ),
-                      child: _isLoading
-                          ? CircularProgressIndicator()
-                          : Text(
-                              'حفظ البيانات',
-                              style: TextStyle(fontSize: 18),
-                            ),
-                    ),
-                    SizedBox(height: 20),
                   ],
                 ),
-              ),
+                actions: <Widget>[
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      context.read<HomeBloc>().add(LoadHomeData());
+                      Navigator.of(context).pop();
+                    },
+                    child: const Text(
+                      'موافق',
+                      style: TextStyle(
+                        color: Color(0xFF6DAF97),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          );
+        } else if (state is OrphansError) {
+          setState(() {
+            _isLoading = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to add orphan: ${state.message}')),
+          );
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('إضافة يتيم جديد'),
+          backgroundColor: const Color(0xFF6DAF97),
+        ),
+        body: Form(
+          key: _formKey,
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: ListView(
+              children: [
+                _buildSectionTitle('البيانات الشخصية'),
+                _buildTextField(
+                    controller: _nameController,
+                    label: 'اسم اليتيم',
+                    isRequired: true),
+                _buildTextField(
+                    controller: _deceasedNameController,
+                    label: 'اسم المتوفى',
+                    isRequired: true),
+                _buildDropdownField(
+                  label: 'سبب الوفاة',
+                  value: _selectedCauseOfDeath,
+                  items: ['استشهاد', 'مرض', 'حادث', 'أخرى'],
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedCauseOfDeath = value;
+                    });
+                  },
+                ),
+                // ✅ استخدام دالة بناء حقل التاريخ المعدلة
+                _buildDateField(
+                  label: 'تاريخ الوفاة',
+                  date: _dateOfDeath,
+                  onPressed: () => _selectDate(context, isDateOfBirth: false),
+                  errorText: _deathDateErrorText,
+                ),
+                _buildTextField(
+                    controller: _deceasedIdNumberController,
+                    label: 'رقم هوية المتوفى',
+                    isRequired: true),
+                _buildDropdownField(
+                  label: 'الجنس',
+                  value: _selectedGender,
+                  items: ['ذكر', 'أنثى'],
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedGender = value;
+                    });
+                  },
+                ),
+                _buildTextField(
+                    controller: _orphanIdNumberController,
+                    label: 'رقم هوية اليتيم',
+                    isRequired: true),
+                _buildDateField(
+                  label: 'تاريخ الميلاد',
+                  date: _dateOfBirth,
+                  onPressed: () => _selectDate(context, isDateOfBirth: true),
+                  errorText: _birthDateErrorText,
+                ),
+                _buildTextField(
+                    controller: _schoolNameController, label: 'اسم المدرسة'),
+                _buildTextField(controller: _gradeController, label: 'الصف'),
+                _buildTextField(
+                    controller: _educationLevelController,
+                    label: 'المستوى التعليمي'),
+                const SizedBox(height: 20),
+                _buildSectionTitle('بيانات العائلة'),
+                _buildTextField(
+                    controller: _motherNameController,
+                    label: 'اسم الأم',
+                    isRequired: true),
+                _buildTextField(
+                    controller: _motherIdNumberController,
+                    label: 'رقم هوية الأم',
+                    isRequired: true),
+                _buildTextField(
+                    controller: _breadwinnerNameController,
+                    label: 'اسم المعيل',
+                    isRequired: true,
+                    readOnly: true),
+                _buildTextField(
+                    controller: _breadwinnerIdNumberController,
+                    label: 'رقم هوية المعيل',
+                    isRequired: true,
+                    readOnly: true),
+                _buildDropdownField(
+                  label: 'الحالة الاجتماعية للمعيل',
+                  value: _selectedMaritalStatus,
+                  items: ['أرمل/ة', 'أعزب/ة', 'متزوج/ة', 'مطلق/ة'],
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedMaritalStatus = value;
+                    });
+                  },
+                ),
+                _buildDropdownField(
+                  label: 'صلة القرابة بالمعيل',
+                  value: _selectedKinship,
+                  items: [
+                    'الأم',
+                    'الأب',
+                    'أخ',
+                    'أخت',
+                    'عم',
+                    'عمة',
+                    'جد',
+                    'جدة',
+                    'أخرى'
+                  ],
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedKinship = value;
+                    });
+                  },
+                ),
+                _buildDropdownField(
+                  label: 'المحافظة',
+                  value: _selectedGovernorate,
+                  items: _governoratesAndCities.keys.toList(),
+                  isRequired: true,
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedGovernorate = value;
+                      _selectedCity = null;
+                    });
+                  },
+                ),
+                if (_selectedGovernorate != null)
+                  _buildDropdownField(
+                    label: 'المدينة',
+                    value: _selectedCity,
+                    items: _governoratesAndCities[_selectedGovernorate!]!,
+                    isRequired: true,
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedCity = value;
+                      });
+                    },
+                  ),
+                _buildTextField(
+                    controller: _neighborhoodController, label: 'الحي'),
+                _buildTextField(
+                    controller: _numberOfMalesController,
+                    label: 'عدد الذكور',
+                    keyboardType: TextInputType.number),
+                _buildTextField(
+                    controller: _numberOfFemalesController,
+                    label: 'عدد الإناث',
+                    keyboardType: TextInputType.number),
+                _buildTextField(
+                    controller: _totalFamilyMembersController,
+                    label: 'إجمالي أفراد العائلة',
+                    keyboardType: TextInputType.number,
+                    isRequired: true),
+                _buildTextField(
+                    controller: _mobileNumberController,
+                    label: 'رقم الجوال',
+                    keyboardType: TextInputType.phone,
+                    isRequired: true),
+                _buildTextField(
+                    controller: _phoneNumberController,
+                    label: 'رقم الهاتف',
+                    keyboardType: TextInputType.phone),
+                const SizedBox(height: 20),
+                _buildSectionTitle('المستندات'),
+                _buildFilePicker(
+                  label: 'بطاقة الهوية',
+                  file: _idCardFile,
+                  bytes: _idCardBytes,
+                  onPressed: () async {
+                    FilePickerResult? result = await FilePicker.platform.pickFiles(
+                      type: FileType.custom,
+                      allowedExtensions: ['jpg', 'png', 'pdf'],
+                      withData: kIsWeb,
+                    );
+                    if (result != null) {
+                      if (kIsWeb) {
+                        setState(() {
+                          _idCardBytes = result.files.first.bytes;
+                        });
+                      } else {
+                        setState(() {
+                          _idCardFile = File(result.files.single.path!);
+                        });
+                      }
+                    }
+                  },
+                ),
+                _buildFilePicker(
+                  label: 'شهادة الوفاة',
+                  file: _deathCertificateFile,
+                  bytes: _deathCertificateBytes,
+                  onPressed: () async {
+                    FilePickerResult? result = await FilePicker.platform.pickFiles(
+                      type: FileType.custom,
+                      allowedExtensions: ['jpg', 'png', 'pdf'],
+                      withData: kIsWeb,
+                    );
+                    if (result != null) {
+                      if (kIsWeb) {
+                        setState(() {
+                          _deathCertificateBytes = result.files.first.bytes;
+                        });
+                      } else {
+                        setState(() {
+                          _deathCertificateFile = File(result.files.single.path!);
+                        });
+                      }
+                    }
+                  },
+                ),
+                _buildFilePicker(
+                  label: 'صورة اليتيم',
+                  file: _orphanPhotoFile,
+                  bytes: _orphanPhotoBytes,
+                  onPressed: () async {
+                    FilePickerResult? result = await FilePicker.platform.pickFiles(
+                      type: FileType.custom,
+                      allowedExtensions: ['jpg', 'png', 'pdf'],
+                      withData: kIsWeb,
+                    );
+                    if (result != null) {
+                      if (kIsWeb) {
+                        setState(() {
+                          _orphanPhotoBytes = result.files.first.bytes;
+                        });
+                      } else {
+                        setState(() {
+                          _orphanPhotoFile = File(result.files.single.path!);
+                        });
+                      }
+                    }
+                  },
+                ),
+                const SizedBox(height: 20),
+                ElevatedButton(
+                  onPressed: _isLoading ? null : _onSave,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF6DAF97),
+                    minimumSize: const Size(double.infinity, 50),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: _isLoading
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text(
+                          'إضافة يتيم',
+                          style: TextStyle(color: Colors.white, fontSize: 18),
+                        ),
+                ),
+              ],
             ),
+          ),
+        ),
+      ),
     );
   }
 
-  // دالة مساعدة لإنشاء TextFormField
-  Widget _buildTextFormField({
+  // دالة مساعدة لإنشاء عنوان القسم
+  Widget _buildSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 16.0, bottom: 8.0),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+          color: Color(0xFF4C7F7F),
+        ),
+      ),
+    );
+  }
+
+  // دالة مساعدة لإنشاء حقل الإدخال
+  Widget _buildTextField({
     required TextEditingController controller,
-    required String labelText,
-    String? Function(String?)? validator,
+    required String label,
+    bool isRequired = false,
     TextInputType keyboardType = TextInputType.text,
+    bool readOnly = false,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: TextFormField(
         controller: controller,
-        decoration: InputDecoration(
-          labelText: labelText,
-          border: OutlineInputBorder(),
-          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        ),
         keyboardType: keyboardType,
-        validator: validator,
+        readOnly: readOnly,
+        decoration: InputDecoration(
+          labelText: label,
+          filled: true,
+          fillColor: Colors.grey[200],
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: Color(0xFF6DAF97)),
+          ),
+        ),
+        validator: (value) {
+          if (isRequired && (value == null || value.isEmpty)) {
+            return 'الرجاء إدخال $label';
+          }
+          return null;
+        },
       ),
     );
   }
 
-  // دالة مساعدة لإنشاء Dropdown
-  Widget _buildDropdown({
+  // دالة مساعدة لإنشاء حقل القائمة المنسدلة
+  Widget _buildDropdownField({
+    required String label,
     required String? value,
     required List<String> items,
-    required String hint,
-    required String label,
     required Function(String?) onChanged,
-    String? Function(String?)? validator,
+    bool isRequired = false,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: DropdownButtonFormField<String>(
         value: value,
-        items: items.map((String value) {
-          return DropdownMenuItem<String>(value: value, child: Text(value));
-        }).toList(),
-        onChanged: onChanged,
         decoration: InputDecoration(
           labelText: label,
-          border: OutlineInputBorder(),
-          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          filled: true,
+          fillColor: Colors.grey[200],
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: Color(0xFF6DAF97)),
+          ),
         ),
-        validator: validator,
+        items: items.map((String item) {
+          return DropdownMenuItem<String>(
+            value: item,
+            child: Text(item),
+          );
+        }).toList(),
+        onChanged: onChanged,
+        validator: (value) {
+          if (isRequired && value == null) {
+            return 'الرجاء اختيار $label';
+          }
+          return null;
+        },
       ),
     );
   }
 
-  // دالة مساعدة لإنشاء حقل التاريخ
+  // ✅ دالة بناء حقل التاريخ المعدلة
   Widget _buildDateField({
-    required DateTime? date,
     required String label,
-    required Function() onTap,
+    required DateTime? date,
+    required VoidCallback onPressed,
+    String? errorText,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: InkWell(
-        onTap: onTap,
+        onTap: onPressed,
         child: InputDecorator(
           decoration: InputDecoration(
             labelText: label,
-            border: OutlineInputBorder(),
-            contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            filled: true,
+            fillColor: Colors.grey[200],
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide.none,
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: Color(0xFF6DAF97)),
+            ),
+            errorText: errorText, // ✅ استخدام متغير الحالة لعرض الخطأ
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
+            children: <Widget>[
               Text(
                 date != null
-                    ? "${date.day}/${date.month}/${date.year}"
+                    ? DateFormat('d/M/yyyy').format(date)
                     : 'اختر التاريخ',
-                style: TextStyle(fontSize: 16),
+                style: const TextStyle(fontSize: 16),
               ),
-              Icon(Icons.calendar_today, size: 20),
+              const Icon(Icons.calendar_today, size: 20),
             ],
           ),
         ),
@@ -640,9 +666,21 @@ class _AddNewOrphanScreenState extends State<AddNewOrphanScreen> {
   // دالة مساعدة لإنشاء حقل رفع الملف
   Widget _buildFilePicker({
     required String label,
-    required File? file,
+    File? file,
+    Uint8List? bytes,
     required Function() onPressed,
   }) {
+    String fileName = '';
+    if (kIsWeb) {
+      if (bytes != null) {
+        fileName = 'تم اختيار ملف';
+      }
+    } else {
+      if (file != null) {
+        fileName = file.path.split('/').last;
+      }
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Column(
@@ -650,21 +688,32 @@ class _AddNewOrphanScreenState extends State<AddNewOrphanScreen> {
         children: [
           Text(
             label,
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
           ),
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           Row(
             children: [
-              ElevatedButton(onPressed: onPressed, child: Text('اختر ملف')),
-              SizedBox(width: 16),
-              if (file != null)
-                Expanded(
-                  child: Text(
-                    file.path.split('/').last,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 14),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: onPressed,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF6DAF97),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
+                  child: const Text('اختر ملف', style: TextStyle(color: Colors.white)),
                 ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                flex: 2,
+                child: Text(
+                  fileName,
+                  style: const TextStyle(fontStyle: FontStyle.italic),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             ],
           ),
         ],

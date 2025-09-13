@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class Orphan {
+  final String institutionId;
   final String? id;
   final String name;
   final String deceasedName;
@@ -30,11 +31,13 @@ class Orphan {
   final String? educationLevel;
   final String? idCardUrl;
   final String? deathCertificateUrl;
-  final String? orphanPhotoUrl; // إضافة حقل صورة اليتيم
-  final DateTime createdAt;
-  final DateTime updatedAt;
+  final String? orphanPhotoUrl;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
+  final bool isArchived; 
 
   Orphan({
+    required this.institutionId,
     this.id,
     required this.name,
     required this.deceasedName,
@@ -53,9 +56,9 @@ class Orphan {
     this.governorate,
     this.city,
     this.neighborhood,
-    required this.numberOfMales,
-    required this.numberOfFemales,
-    required this.totalFamilyMembers,
+    this.numberOfMales = 0,
+    this.numberOfFemales = 0,
+    this.totalFamilyMembers = 0,
     this.mobileNumber,
     this.phoneNumber,
     required this.orphanNo,
@@ -64,22 +67,23 @@ class Orphan {
     this.educationLevel,
     this.idCardUrl,
     this.deathCertificateUrl,
-    this.orphanPhotoUrl, // إضافة حقل صورة اليتيم
-    required this.createdAt,
-    required this.updatedAt,
+    this.orphanPhotoUrl,
+    this.createdAt,
+    this.updatedAt,
+    this.isArchived = false,
   });
 
-  // تحويل الكائن إلى Map لإرساله إلى Firestore
   Map<String, dynamic> toMap() {
     return {
+      'institutionId': institutionId,
       'name': name,
       'deceasedName': deceasedName,
       'causeOfDeath': causeOfDeath,
-      'dateOfDeath': dateOfDeath != null ? Timestamp.fromDate(dateOfDeath!) : null,
+      'dateOfDeath': dateOfDeath,
       'deceasedIdNumber': deceasedIdNumber,
       'gender': gender,
       'orphanIdNumber': orphanIdNumber,
-      'dateOfBirth': dateOfBirth != null ? Timestamp.fromDate(dateOfBirth!) : null,
+      'dateOfBirth': dateOfBirth,
       'motherIdNumber': motherIdNumber,
       'motherName': motherName,
       'breadwinnerIdNumber': breadwinnerIdNumber,
@@ -100,53 +104,55 @@ class Orphan {
       'educationLevel': educationLevel,
       'idCardUrl': idCardUrl,
       'deathCertificateUrl': deathCertificateUrl,
-      'orphanPhotoUrl': orphanPhotoUrl, // إضافة حقل صورة اليتيم
-      'createdAt': Timestamp.fromDate(createdAt),
-      'updatedAt': Timestamp.fromDate(updatedAt),
+      'orphanPhotoUrl': orphanPhotoUrl,
+      'createdAt': createdAt,
+      'updatedAt': updatedAt,
+      'isArchived': isArchived,
     };
   }
 
-  // إنشاء كائن Orphan من Map قادم من Firestore
-  factory Orphan.fromMap(Map<String, dynamic> map, String id) {
+  static Orphan fromMap(Map<String, dynamic> map, {String? id}) {
     return Orphan(
+      institutionId: map['institutionId'] as String,
       id: id,
-      name: map['name'] ?? '',
-      deceasedName: map['deceasedName'] ?? '',
-      causeOfDeath: map['causeOfDeath'],
+      name: map['name'] as String,
+      deceasedName: map['deceasedName'] as String,
+      causeOfDeath: map['causeOfDeath'] as String?,
       dateOfDeath: (map['dateOfDeath'] as Timestamp?)?.toDate(),
-      deceasedIdNumber: map['deceasedIdNumber'],
-      gender: map['gender'],
-      orphanIdNumber: map['orphanIdNumber'],
+      deceasedIdNumber: map['deceasedIdNumber'] as String?,
+      gender: map['gender'] as String?,
+      orphanIdNumber: map['orphanIdNumber'] as String?,
       dateOfBirth: (map['dateOfBirth'] as Timestamp?)?.toDate(),
-      motherIdNumber: map['motherIdNumber'],
-      motherName: map['motherName'],
-      breadwinnerIdNumber: map['breadwinnerIdNumber'],
-      breadwinnerName: map['breadwinnerName'],
-      breadwinnerMaritalStatus: map['breadwinnerMaritalStatus'],
-      breadwinnerKinship: map['breadwinnerKinship'],
-      governorate: map['governorate'],
-      city: map['city'],
-      neighborhood: map['neighborhood'],
-      numberOfMales: map['numberOfMales'] ?? 0,
-      numberOfFemales: map['numberOfFemales'] ?? 0,
-      totalFamilyMembers: map['totalFamilyMembers'] ?? 0,
-      mobileNumber: map['mobileNumber'],
-      phoneNumber: map['phoneNumber'],
-      orphanNo: map['orphanNo'] ?? '',
-      schoolName: map['schoolName'],
-      grade: map['grade'],
-      educationLevel: map['educationLevel'],
-      idCardUrl: map['idCardUrl'],
-      deathCertificateUrl: map['deathCertificateUrl'],
-      orphanPhotoUrl: map['orphanPhotoUrl'], // إضافة حقل صورة اليتيم
-      createdAt: (map['createdAt'] as Timestamp).toDate(),
-      updatedAt: (map['updatedAt'] as Timestamp).toDate(),
+      motherIdNumber: map['motherIdNumber'] as String?,
+      motherName: map['motherName'] as String?,
+      breadwinnerIdNumber: map['breadwinnerIdNumber'] as String?,
+      breadwinnerName: map['breadwinnerName'] as String?,
+      breadwinnerMaritalStatus: map['breadwinnerMaritalStatus'] as String?,
+      breadwinnerKinship: map['breadwinnerKinship'] as String?,
+      governorate: map['governorate'] as String?,
+      city: map['city'] as String?,
+      neighborhood: map['neighborhood'] as String?,
+      numberOfMales: map['numberOfMales'] as int? ?? 0,
+      numberOfFemales: map['numberOfFemales'] as int? ?? 0,
+      totalFamilyMembers: map['totalFamilyMembers'] as int? ?? 0,
+      mobileNumber: map['mobileNumber'] as String?,
+      phoneNumber: map['phoneNumber'] as String?,
+      orphanNo: map['orphanNo'] as String,
+      schoolName: map['schoolName'] as String?,
+      grade: map['grade'] as String?,
+      educationLevel: map['educationLevel'] as String?,
+      idCardUrl: map['idCardUrl'] as String?,
+      deathCertificateUrl: map['deathCertificateUrl'] as String?,
+      orphanPhotoUrl: map['orphanPhotoUrl'] as String?,
+      createdAt: (map['createdAt'] as Timestamp?)?.toDate(),
+      updatedAt: (map['updatedAt'] as Timestamp?)?.toDate(),
+      isArchived: map['isArchived'] as bool? ?? false,
     );
   }
 
-  // نسخ الكائن مع إمكانية تحديث بعض الخصائص
   Orphan copyWith({
     String? id,
+    String? institutionId,
     String? name,
     String? deceasedName,
     String? causeOfDeath,
@@ -175,12 +181,14 @@ class Orphan {
     String? educationLevel,
     String? idCardUrl,
     String? deathCertificateUrl,
-    String? orphanPhotoUrl, // إضافة حقل صورة اليتيم
+    String? orphanPhotoUrl,
     DateTime? createdAt,
     DateTime? updatedAt,
+    bool? isArchived,
   }) {
     return Orphan(
       id: id ?? this.id,
+      institutionId: institutionId ?? this.institutionId,
       name: name ?? this.name,
       deceasedName: deceasedName ?? this.deceasedName,
       causeOfDeath: causeOfDeath ?? this.causeOfDeath,
@@ -209,9 +217,10 @@ class Orphan {
       educationLevel: educationLevel ?? this.educationLevel,
       idCardUrl: idCardUrl ?? this.idCardUrl,
       deathCertificateUrl: deathCertificateUrl ?? this.deathCertificateUrl,
-      orphanPhotoUrl: orphanPhotoUrl ?? this.orphanPhotoUrl, // إضافة حقل صورة اليتيم
+      orphanPhotoUrl: orphanPhotoUrl ?? this.orphanPhotoUrl,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      isArchived: isArchived ?? this.isArchived,
     );
   }
 }

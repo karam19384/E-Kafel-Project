@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart'; // لإدارة تنسيق التاريخ
@@ -82,13 +81,9 @@ class _EditOrphanDetailsScreenState extends State<EditOrphanDetailsScreen> {
             try {
               _latestSupportDate = DateTime.parse(data['latestSupportDate']);
             } catch (e) {
-              if (kDebugMode) {
-                
-                  print(
+              print(
                 'Error parsing date string: ${data['latestSupportDate']} - $e',
               );
-                
-              }
               _latestSupportDate = null;
             }
           }
@@ -114,9 +109,7 @@ class _EditOrphanDetailsScreenState extends State<EditOrphanDetailsScreen> {
         _isLoading = false;
         _errorMessage = 'Error loading orphan details: $e';
       });
-      if (kDebugMode) {
-        print('Error fetching orphan details: $e');
-      }
+      print('Error fetching orphan details: $e');
     }
   }
 
@@ -165,9 +158,7 @@ class _EditOrphanDetailsScreenState extends State<EditOrphanDetailsScreen> {
           SnackBar(content: Text('Failed to update orphan details: $e')),
         );
       }
-      if (kDebugMode) {
-        print('Error updating orphan details: $e');
-      }
+      print('Error updating orphan details: $e');
     } finally {
       setState(() {
         _isLoading = false;

@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -59,9 +58,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _isLoading = false;
         _errorMessage = 'Error loading user data: $e';
       });
-      if (kDebugMode) {
-        print('Error fetching user data: $e');
-      }
+      print('Error fetching user data: $e');
     }
   }
 
@@ -86,9 +83,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         content: Text('Edit Profile functionality to be implemented.'),
       ),
     );
-    if (kDebugMode) {
-      print('Navigate to Edit Profile Screen');
-    }
+    print('Navigate to Edit Profile Screen');
   }
 
   @override

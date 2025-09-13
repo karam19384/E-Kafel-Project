@@ -9,9 +9,10 @@ abstract class AuthEvent extends Equatable {
   List<Object?> get props => [];
 }
 
-class CheckAuthStatus extends AuthEvent {}
-class AppStarted extends AuthEvent {} // أضف هذا السطر
 
+class CheckAuthStatus extends AuthEvent {}
+
+class AppStarted extends AuthEvent {}
 
 class LoginButtonPressed extends AuthEvent {
   final String email;
@@ -24,39 +25,48 @@ class LoginButtonPressed extends AuthEvent {
 }
 
 class LogoutButtonPressed extends AuthEvent {}
-// lib/src/blocs/auth/auth_event.dart
 
 class SignUpButtonPressed extends AuthEvent {
   final String name;
   final String email;
   final String password;
-  final String userRole;
-  final String? institutionId;
-  // إضافة المتغيرات الجديدة هنا
   final String address;
   final String website;
   final String headName;
   final String headEmail;
   final String headMobileNumber;
+    final String userRole;
+
 
   const SignUpButtonPressed({
     required this.name,
     required this.email,
     required this.password,
-    required this.userRole,
-    this.institutionId,
-    // يجب أن تكون المتغيرات الجديدة مطلوبة أيضاً
     required this.address,
     required this.website,
     required this.headName,
     required this.headEmail,
     required this.headMobileNumber,
+        required this.userRole,
+
   });
 
   @override
   List<Object?> get props => [
-    name, email, password, userRole, institutionId,
-    address, website, headName, headEmail, headMobileNumber,
-  ];
+        name,
+        email,
+        password,
+        address,
+        website,
+        headName,
+        headEmail,
+        headMobileNumber,
+        userRole,
+      ];
+}
 
-}class SignInWithGoogleButtonPressed extends AuthEvent {}
+
+class SignInWithGoogleButtonPressed extends AuthEvent {}
+
+
+

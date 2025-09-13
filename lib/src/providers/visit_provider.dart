@@ -1,5 +1,6 @@
 // ملف: lib/providers/visit_provider.dart
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/visit.dart';
 

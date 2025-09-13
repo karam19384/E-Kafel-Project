@@ -1,4 +1,6 @@
 // lib/src/screens/home_screen.dart
+import 'package:e_kafel/src/screens/orphans_list_screen.dart';
+import 'package:e_kafel/src/screens/tasks_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:e_kafel/src/blocs/home/home_bloc.dart';
@@ -6,9 +8,9 @@ import 'package:e_kafel/src/blocs/auth/auth_bloc.dart';
 import 'package:e_kafel/src/screens/login_screen.dart';
 import 'package:e_kafel/src/screens/add_new_orphan_screen.dart';
 import 'package:e_kafel/src/screens/field_visits_screen.dart';
-import 'package:e_kafel/src/screens/orphans_list_screen.dart';
 import 'package:e_kafel/src/widgets/app_drawer.dart';
-import 'tasks_screen.dart';
+
+import 'supervisors_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -24,305 +26,56 @@ class _HomeScreenState extends State<HomeScreen> {
     context.read<HomeBloc>().add(LoadHomeData());
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Home Screen'),
-        backgroundColor: const Color(0xFF6DAF97),
-        elevation: 0,
-        leading: Builder(
-          builder: (BuildContext context) {
-            return IconButton(
-              icon: const Icon(Icons.menu, color: Colors.white),
-              onPressed: () {
-                Scaffold.of(context).openDrawer();
-              },
-            );
-          },
-        ),
-      ),
-      drawer: BlocBuilder<HomeBloc, HomeState>(
-        builder: (context, state) {
-          if (state is HomeLoaded) {
-            return AppDrawer(
-              userName: state.userName,
-              userRole: state.userRole,
-              profileImageUrl: state.profileImageUrl,
-              orphanCount: state.orphanSponsored,
-              taskCount: state.completedTasksPercentage.toInt(),
-              visitCount: state.completedFieldVisits,
-              onLogout: () {
-                context.read<AuthBloc>().add(LogoutButtonPressed());
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (context) => const LoginScreen()),
-                  (Route<dynamic> route) => false,
-                );
-              },
-            );
-          }
-          return const Drawer();
-        },
-      ),
-      body: BlocBuilder<HomeBloc, HomeState>(
-        builder: (context, state) {
-          if (state is HomeLoading) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (state is HomeLoaded) {
-            // حساب القيم الإضافية بناءً على البيانات المتاحة
-            final int totalOrphans =
-                state.orphanSponsored + state.orphanRequiringUpdates;
-            final int totalVisits =
-                state.completedFieldVisits +
-                5; // تقديري - تحتاج إلى بيانات حقيقية
-
-            return SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Section 1: Dashboard Stats Cards
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _buildStatCard(
-                        context,
-                        'ORPHAN SPONSORED',
-                        state.orphanSponsored.toString(),
-                        '${((state.orphanSponsored / totalOrphans) * 100).toStringAsFixed(0)}%',
-                        Icons.child_care,
-                        const Color(0xFFC8A2C8),
-                        () {
-                          // الانتقال إلى قائمة الأيتام المكفولين
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => OrphansListScreen(),
-                            ),
-                          );
-                        },
-                      ),
-                      _buildStatCard(
-                        context,
-                        'COMPLETED TASKS',
-                        state.completedTasksPercentage.toInt().toString(),
-                        '${state.completedTasksPercentage.toStringAsFixed(0)}%',
-                        Icons.check_circle_outline,
-                        const Color(0xFF4C7F7F),
-                        () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => TasksScreen(),
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _buildStatCard(
-                        context,
-                        'ORPHAN REQUIRING DATA UPDATES',
-                        state.orphanRequiringUpdates.toString(),
-                        '${((state.orphanRequiringUpdates / totalOrphans) * 100).toStringAsFixed(0)}%',
-                        Icons.edit,
-                        const Color(0xFF6DAF97),
-                        () {
-                          // الانتقال إلى قائمة الأيتام المحتاجة للتحديث
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => OrphansListScreen(),
-                            ),
-                          );
-                        },
-                      ),
-                      _buildStatCard(
-                        context,
-                        'SUPERVISOR',
-                        state.supervisorsCount.toString(),
-                        'ACTIVE',
-                        Icons.group,
-                        const Color(0xFFC8A2C8),
-                        () {
-                          // الانتقال إلى قائمة المشرفين
-                          // Navigator.push(
-                          //   context,
-                          //   MaterialPageRoute(
-                          //     builder: (context) => SupervisorsScreen(),
-                          //   ),
-                          // );
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('شاشة المشرفين قريبًا')),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  _buildStatCard(
-                    context,
-                    'COMPLETED FIELD VISITS',
-                    state.completedFieldVisits.toString(),
-                    '${((state.completedFieldVisits / totalVisits) * 100).toStringAsFixed(0)}%',
-                    Icons.location_on,
-                    const Color(0xFF4C7F7F),
-                    () {
-                      // الانتقال إلى شاشة الزيارات الميدانية
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => FieldVisitsScreen(),
-                        ),
-                      );
-                    },
-                    fullWidth: true,
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Section 2: Action Buttons
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    const AddNewOrphanScreen(),
-                              ),
-                            );
-                          },
-                          icon: const Icon(Icons.person_add),
-                          label: const Text('ADD NEW ORPHAN'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFE0BBE4),
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) => const FieldVisitsScreen(),
-                              ),
-                            );
-                          },
-                          icon: const Icon(Icons.add_location),
-                          label: const Text('ADD NEW VISIT'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFE0BBE4),
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Section 3: Scheduled Visits
-                  const Text(
-                    'Scheduled Visits',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF4C7F7F),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  state.scheduledVisits.isEmpty
-                      ? const Text('لا توجد زيارات مجدولة')
-                      : ListView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: state.scheduledVisits.length,
-                          itemBuilder: (context, index) {
-                            final visit = state.scheduledVisits[index];
-                            return _buildVisitCard(
-                              date: visit['date'] ?? '',
-                              name: visit['name'] ?? '',
-                              location: visit['location'] ?? '',
-                              onTap: () {
-                                // الانتقال إلى تفاصيل الزيارة
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      'تفاصيل زيارة ${visit['name']}',
-                                    ),
-                                  ),
-                                );
-                              },
-                            );
-                          },
-                        ),
-                ],
-              ),
-            );
-          }
-          if (state is HomeError) {
-            return Center(child: Text('Error: ${state.message}'));
-          }
-          return const Center(child: Text('Please log in.'));
-        },
-      ),
-    );
-  }
-
-  Widget _buildStatCard(
-    BuildContext context,
-    String title,
-    String value,
-    String percentage,
-    IconData icon,
-    Color color,
-    VoidCallback onTap, {
-    bool fullWidth = false,
+  Widget _buildDashboardCard({
+    required String title,
+    required int count,
+    required Color color,
+    required IconData icon,
+    required VoidCallback onTap,
   }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Card(
-        elevation: 4,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          width: fullWidth ? double.infinity : 150,
-          child: Column(
-            children: [
-              Icon(icon, size: 40, color: color),
-              const SizedBox(height: 8),
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: color,
+    String countText = count.toString();
+    if (count is double) {
+      countText = '${(count).toInt()}';
+    }
+
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+      elevation: 0,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: color.withOpacity(0.4)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                  ),
                 ),
+                Icon(icon, color: color),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              countText,
+              style: TextStyle(
+                fontSize: 32,
+                fontWeight: FontWeight.bold,
+                color: color,
               ),
-              const SizedBox(height: 4),
-              Text(
-                percentage,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: color,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -334,10 +87,9 @@ class _HomeScreenState extends State<HomeScreen> {
     required String location,
     required VoidCallback onTap,
   }) {
-    return GestureDetector(
+    return InkWell(
       onTap: onTap,
       child: Card(
-        elevation: 2,
         margin: const EdgeInsets.only(bottom: 12),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         child: Padding(
@@ -351,13 +103,19 @@ class _HomeScreenState extends State<HomeScreen> {
                   color: const Color(0xFF6DAF97).withOpacity(0.2),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Text(
-                  date,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF4C7F7F),
-                  ),
+                child: Column(
+                  children: [
+                    const Icon(Icons.calendar_today, color: Color(0xFF4C7F7F)),
+                    const SizedBox(height: 4),
+                    Text(
+                      date,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF4C7F7F),
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(width: 16),
@@ -366,21 +124,425 @@ class _HomeScreenState extends State<HomeScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'VISIT ${name.toUpperCase()}',
+                      name,
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         color: Color(0xFF4C7F7F),
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Text(location),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.location_on,
+                          size: 16,
+                          color: Colors.grey,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            location,
+                            style: const TextStyle(color: Colors.grey),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
+              const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocConsumer<AuthBloc, AuthState>(
+      listener: (context, state) {
+        if (state is AuthUnauthenticated) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (context) => const LoginScreen()),
+            (Route<dynamic> route) => false,
+          );
+        }
+      },
+      builder: (context, authState) {
+        return Scaffold(
+          drawer: _buildDrawer(),
+          body: BlocBuilder<HomeBloc, HomeState>(
+            builder: (context, state) {
+              if (state is HomeLoading) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (state is HomeLoaded) {
+                return Stack(
+                  children: [
+                    SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.fromLTRB(24, 60, 24, 20),
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF6DAF97),
+                              borderRadius: BorderRadius.vertical(
+                                bottom: Radius.circular(30),
+                              ),
+                            ),
+                            child: Column(
+                              children: [
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    GestureDetector(
+                                      onTap: () =>
+                                          Scaffold.of(context).openDrawer(),
+                                      child: const CircleAvatar(
+                                        backgroundColor: Colors.white,
+                                        child: Icon(
+                                          Icons.menu,
+                                          color: Color(0xFF6DAF97),
+                                        ),
+                                      ),
+                                    ),
+                                    Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          'مرحبا، ${state.userName}',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 24,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        Text(
+                                          '${state.userRole} في الميدان',
+                                          style: TextStyle(
+                                            color: Colors.white.withOpacity(
+                                              0.8,
+                                            ),
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    Row(
+                                      children: [
+                                        IconButton(
+                                          onPressed: () {},
+                                          icon: const Icon(
+                                            Icons.notifications_none,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 20),
+                                Card(
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  elevation: 0,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(20),
+                                    decoration: BoxDecoration(
+                                      color: const Color(
+                                        0xFF4C7F7F,
+                                      ).withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                        color: const Color(
+                                          0xFF4C7F7F,
+                                        ).withOpacity(0.4),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceAround,
+                                      children: [
+                                        Column(
+                                          children: [
+                                            Text(
+                                              'المهام',
+                                              style: TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.bold,
+                                                color: const Color(0xFF4C7F7F),
+                                              ),
+                                            ),
+                                            const SizedBox(height: 8),
+                                            Text(
+                                              '${state.completedTasks}/${state.totalTasks}',
+                                              style: TextStyle(
+                                                fontSize: 24,
+                                                fontWeight: FontWeight.bold,
+                                                color: const Color(0xFF4C7F7F),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        SizedBox(
+                                          height: 80,
+                                          width: 80,
+                                          child: CircularProgressIndicator(
+                                            value:
+                                                state.completedTasksPercentage /
+                                                100,
+                                            backgroundColor: Colors.grey
+                                                .withOpacity(0.2),
+                                            color: const Color(0xFF6DAF97),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: _buildDashboardCard(
+                                        title: 'إجمالي الأيتام',
+                                        count: state.totalOrphans,
+                                        color: Colors.lightGreen,
+                                        icon: Icons.people,
+                                        onTap: () {
+                                          Navigator.pop(context);
+                                          Navigator.pushReplacement(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (context) =>
+                                                  const OrphansListScreen(),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: _buildDashboardCard(
+                                        title: 'أيتام بحاجة لتحديث',
+                                        count: state.orphanRequiringUpdates,
+                                        color: Colors.orange,
+                                        icon: Icons.person_off,
+                                        onTap: () {
+                                          Navigator.pop(context);
+                                          Navigator.pushReplacement(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (context) =>
+                                                  const OrphansListScreen(),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: _buildDashboardCard(
+                                        title: 'الأيتام المكفولين',
+                                        count: state.orphanSponsored,
+                                        color: Colors.blue,
+                                        icon: Icons.favorite,
+                                        onTap: () {
+                                          Navigator.pop(context);
+                                          Navigator.pushReplacement(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (context) =>
+                                                  const OrphansListScreen(),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: _buildDashboardCard(
+                                        title: 'الزيارات المنجزة',
+                                        count: state.completedFieldVisits,
+                                        color: Colors.purple,
+                                        icon: Icons.assignment_turned_in,
+                                        onTap: () {
+                                          Navigator.pop(context);
+                                          Navigator.pushReplacement(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (context) =>
+                                                  const TasksScreen(),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: _buildDashboardCard(
+                                        title: 'عدد المشرفين',
+                                        count: state.supervisorsCount,
+                                        color: Colors.red,
+                                        icon: Icons.person_outline,
+                                        onTap: () {
+                                          Navigator.pushReplacement(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (context) =>
+                                                  const SupervisorsScreen(),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 24),
+                                const Text(
+                                  'الزيارات المجدولة',
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF4C7F7F),
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                state.scheduledVisits.isEmpty
+                                    ? const Center(
+                                        child: Text('لا توجد زيارات مجدولة'),
+                                      )
+                                    : ListView.builder(
+                                        shrinkWrap: true,
+                                        physics:
+                                            const NeverScrollableScrollPhysics(),
+                                        itemCount: state.scheduledVisits.length,
+                                        itemBuilder: (context, index) {
+                                          final visit =
+                                              state.scheduledVisits[index];
+                                          return _buildVisitCard(
+                                            date: visit['date'] ?? '',
+                                            name: visit['name'] ?? '',
+                                            location: visit['location'] ?? '',
+                                            onTap: () {
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
+                                                const SnackBar(
+                                                  content: Text(
+                                                    'تفاصيل الزيارة',
+                                                  ),
+                                                ),
+                                              );
+                                            },
+                                          );
+                                        },
+                                      ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Positioned(
+                      bottom: 20,
+                      right: 20,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          FloatingActionButton.extended(
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      const FieldVisitsScreen(),
+                                ),
+                              );
+                            },
+                            label: const Text('إضافة زيارة ميدانية'),
+                            icon: const Icon(Icons.add),
+                            backgroundColor: const Color(0xFF6DAF97),
+                            foregroundColor: Colors.white,
+                          ),
+                          const SizedBox(height: 10),
+                          FloatingActionButton.extended(
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) => AddNewOrphanScreen(
+                                    institutionId: state.institutionId,
+                                  ),
+                                ),
+                              );
+                            },
+                            label: const Text('إضافة يتيم جديد'),
+                            icon: const Icon(Icons.person_add),
+                            backgroundColor: const Color(0xFF4C7F7F),
+                            foregroundColor: Colors.white,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+              }
+              if (state is HomeError) {
+                return Center(child: Text('Error: ${state.message}'));
+              }
+              return const Center(child: Text('Please log in.'));
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDrawer() {
+    return BlocBuilder<HomeBloc, HomeState>(
+      builder: (context, state) {
+        if (state is HomeLoaded) {
+          return AppDrawer(
+            userName: state.userName,
+            userRole: state.userRole,
+            profileImageUrl: state.profileImageUrl,
+            orphanCount: state.totalOrphans,
+            taskCount: state.completedTasks,
+            visitCount: state.completedFieldVisits,
+            onLogout: () {
+              context.read<AuthBloc>().add(LogoutButtonPressed());
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+                (route) => false,
+              );
+            },
+          );
+        }
+        // حالة التحميل أو الخطأ
+        return AppDrawer(
+          userName: 'Loading...',
+          userRole: '...',
+          profileImageUrl: '',
+          orphanCount: 0,
+          taskCount: 0,
+          visitCount: 0,
+          onLogout: () {},
+        );
+      },
     );
   }
 }

@@ -1,48 +1,33 @@
 // lib/src/screens/orphans_list_screen.dart
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:e_kafel/src/blocs/home/home_bloc.dart';
+import 'package:e_kafel/src/blocs/orphans/orphans_bloc.dart';
 import 'package:e_kafel/src/blocs/auth/auth_bloc.dart';
-import 'package:e_kafel/src/services/firestore_service.dart';
 import 'package:e_kafel/src/widgets/app_drawer.dart';
 import 'package:e_kafel/src/screens/login_screen.dart';
 
 class OrphansListScreen extends StatefulWidget {
   final bool showIncomplete;
-
   const OrphansListScreen({super.key, this.showIncomplete = false});
-
   @override
   State<OrphansListScreen> createState() => _OrphansListScreenState();
 }
 
 class _OrphansListScreenState extends State<OrphansListScreen> {
-  final FirestoreService _firestoreService = FirestoreService();
   final TextEditingController _searchController = TextEditingController();
-
-  String? _institutionId;
   bool _isSearching = false;
-
   // Filter & Sort variables
   RangeValues _supportRange = const RangeValues(0, 10000);
-  DateTime _birthStart = DateTime(2000, 1, 1);
-  DateTime _birthEnd = DateTime.now();
-  DateTime _deathStart = DateTime(2000, 1, 1);
-  DateTime _deathEnd = DateTime.now();
-  DateTime _sponsorshipStart = DateTime(2000, 1, 1);
-  DateTime _sponsorshipEnd = DateTime.now();
   String? _gender;
   String? _ageGroup;
   String _sortField = 'name';
   bool _sortAsc = true;
 
-  Stream<QuerySnapshot>? _orphansStream;
-
   @override
   void initState() {
     super.initState();
-    _fetchInstitutionId();
+    _fetchOrphans();
   }
 
   @override
@@ -51,88 +36,87 @@ class _OrphansListScreenState extends State<OrphansListScreen> {
     super.dispose();
   }
 
-  Future<void> _fetchInstitutionId() async {
+  void _fetchOrphans() {
     final homeState = BlocProvider.of<HomeBloc>(context).state;
     if (homeState is HomeLoaded) {
-      _institutionId = homeState.institutionId;
-      _applyFilters();
+      context.read<OrphansBloc>().add(LoadOrphans());
     }
   }
 
-  void _applyFilters() {
-    if (_institutionId == null) return;
+  List<Map<String, dynamic>> _applyFilters(List<Map<String, dynamic>> orphans) {
+    final searchText = _searchController.text.toLowerCase();
 
-    Query query = _firestoreService.getOrphansQuery(
-      institutionId: _institutionId!,
-      showIncomplete: widget.showIncomplete,
-    );
+    var filtered = orphans.where((orphan) {
+      // Exclude archived
+      if (orphan['isArchived'] == true) return false;
 
-    // Filter by support range
-    query = query
-        .where('totalSupport', isGreaterThanOrEqualTo: _supportRange.start)
-        .where('totalSupport', isLessThanOrEqualTo: _supportRange.end);
+      // Search filter
+      if (searchText.isNotEmpty) {
+        final matchesSearch =
+            (orphan['name'] ?? '').toString().toLowerCase().contains(
+              searchText,
+            ) ||
+            (orphan['idNumber'] ?? '').toString().toLowerCase().contains(
+              searchText,
+            ) ||
+            (orphan['orphanNo'] ?? '').toString().toLowerCase().contains(
+              searchText,
+            ) ||
+            (orphan['guardianPhone'] ?? '').toString().toLowerCase().contains(
+              searchText,
+            );
+        if (!matchesSearch) return false;
+      }
 
-    // Filter by birth date
-    query = query
-        .where(
-          'birthDate',
-          isGreaterThanOrEqualTo: Timestamp.fromDate(_birthStart),
-        )
-        .where('birthDate', isLessThanOrEqualTo: Timestamp.fromDate(_birthEnd));
+      // Support range filter
+      final totalSupport = (orphan['totalSupport'] ?? 0) as num;
+      if (totalSupport < _supportRange.start ||
+          totalSupport > _supportRange.end) {
+        return false;
+      }
 
-    // Filter by death date
-    query = query
-        .where(
-          'deathDate',
-          isGreaterThanOrEqualTo: Timestamp.fromDate(_deathStart),
-        )
-        .where('deathDate', isLessThanOrEqualTo: Timestamp.fromDate(_deathEnd));
+      // Gender filter
+      if (_gender != null && _gender!.isNotEmpty) {
+        if (orphan['gender'] != _gender) return false;
+      }
 
-    // Filter by sponsorship date
-    query = query
-        .where(
-          'latestSupportDate',
-          isGreaterThanOrEqualTo: Timestamp.fromDate(_sponsorshipStart),
-        )
-        .where(
-          'latestSupportDate',
-          isLessThanOrEqualTo: Timestamp.fromDate(_sponsorshipEnd),
-        );
+      // Age group filter
+      if (_ageGroup != null && _ageGroup!.isNotEmpty) {
+        if (orphan['ageGroup'] != _ageGroup) return false;
+      }
 
-    // Gender filter
-    if (_gender != null && _gender!.isNotEmpty) {
-      query = query.where('gender', isEqualTo: _gender);
-    }
+      return true;
+    }).toList();
 
-    // Age filter
-    if (_ageGroup != null && _ageGroup!.isNotEmpty) {
-      query = query.where('ageGroup', isEqualTo: _ageGroup);
-    }
+    // Sorting
+    filtered.sort((a, b) {
+      dynamic aValue = a[_sortField];
+      dynamic bValue = b[_sortField];
 
-    // Apply sorting
-    query = query.orderBy(_sortField, descending: !_sortAsc);
+      if (aValue is String) aValue = aValue.toLowerCase();
+      if (bValue is String) bValue = bValue.toLowerCase();
 
-    setState(() {
-      _orphansStream = query.snapshots();
+      int cmp;
+      if (aValue is Comparable && bValue is Comparable) {
+        cmp = aValue.compareTo(bValue);
+      } else {
+        cmp = 0;
+      }
+      return _sortAsc ? cmp : -cmp;
     });
+
+    return filtered;
   }
 
   void _resetFilters() {
     setState(() {
       _supportRange = const RangeValues(0, 10000);
-      _birthStart = DateTime(2000, 1, 1);
-      _birthEnd = DateTime.now();
-      _deathStart = DateTime(2000, 1, 1);
-      _deathEnd = DateTime.now();
-      _sponsorshipStart = DateTime(2000, 1, 1);
-      _sponsorshipEnd = DateTime.now();
       _gender = null;
       _ageGroup = null;
       _sortField = 'name';
       _sortAsc = true;
       _searchController.clear();
     });
-    _applyFilters();
   }
 
   @override
@@ -154,7 +138,7 @@ class _OrphansListScreenState extends State<OrphansListScreen> {
             ? TextField(
                 controller: _searchController,
                 autofocus: true,
-                onChanged: (value) => setState(() {}),
+                onChanged: (_) => setState(() {}),
                 decoration: const InputDecoration(
                   hintText: 'Search by Name, ID, Orphan No, or Guardian',
                   hintStyle: TextStyle(fontSize: 12, color: Colors.white70),
@@ -171,9 +155,7 @@ class _OrphansListScreenState extends State<OrphansListScreen> {
             ),
             onPressed: () {
               setState(() {
-                if (_isSearching) {
-                  _searchController.clear();
-                }
+                if (_isSearching) _searchController.clear();
                 _isSearching = !_isSearching;
               });
             },
@@ -185,69 +167,44 @@ class _OrphansListScreenState extends State<OrphansListScreen> {
         ],
       ),
       drawer: _buildDrawer(),
-      body: _institutionId == null
-          ? const Center(child: CircularProgressIndicator())
-          : StreamBuilder<QuerySnapshot>(
-              stream: _orphansStream,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                if (snapshot.hasError) {
-                  return Center(child: Text('Error: ${snapshot.error}'));
-                }
-                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                  return const Center(child: Text('No orphans found.'));
-                }
+      body: BlocBuilder<OrphansBloc, OrphansState>(
+        builder: (context, state) {
+          if (state is OrphansLoading || state is OrphansInitial) {
+            return const Center(child: CircularProgressIndicator());
+          } else if (state is OrphansError) {
+            return Center(child: Text('Error: ${state.message}'));
+          } else if (state is OrphansLoaded) {
+            final filteredOrphans = _applyFilters(state.orphans);
 
-                final filteredOrphans = snapshot.data!.docs.where((doc) {
-                  final data = doc.data() as Map<String, dynamic>;
-                  final searchText = _searchController.text.toLowerCase();
-                  return data['name'].toString().toLowerCase().contains(
-                        searchText,
-                      ) ||
-                      data['idNumber'].toString().toLowerCase().contains(
-                        searchText,
-                      ) ||
-                      data['orphanNo'].toString().toLowerCase().contains(
-                        searchText,
-                      ) ||
-                      data['guardianPhone'].toString().toLowerCase().contains(
-                        searchText,
-                      );
-                }).toList();
+            if (filteredOrphans.isEmpty) {
+              return const Center(child: Text('No orphans found.'));
+            }
 
-                if (filteredOrphans.isEmpty) {
-                  return const Center(
-                    child: Text('No matching orphans found.'),
-                  );
+            return ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: filteredOrphans.length,
+              itemBuilder: (context, index) {
+                final orphanData = filteredOrphans[index];
+                String latestSupport = 'N/A';
+                if (orphanData['latestSupportDate'] != null) {
+                  final date = orphanData['latestSupportDate'];
+                  latestSupport = date is DateTime
+                      ? date.toLocal().toString().split(' ')[0]
+                      : date.toString();
                 }
-
-                return ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: filteredOrphans.length,
-                  itemBuilder: (context, index) {
-                    final orphanData =
-                        filteredOrphans[index].data() as Map<String, dynamic>;
-                    String latestSupport = 'N/A';
-                    if (orphanData['latestSupportDate'] is Timestamp) {
-                      latestSupport =
-                          (orphanData['latestSupportDate'] as Timestamp)
-                              .toDate()
-                              .toLocal()
-                              .toString()
-                              .split(' ')[0];
-                    }
-                    return _buildOrphanCard(
-                      name: orphanData['name'] ?? 'Unknown',
-                      phone: orphanData['guardianPhone'] ?? 'N/A',
-                      latestSupport: 'Latest Support: $latestSupport',
-                      imageUrl: orphanData['profileImageUrl'] ?? '',
-                    );
-                  },
+                return _buildOrphanCard(
+                  name: orphanData['name'] ?? 'Unknown',
+                  phone: orphanData['guardianPhone'] ?? 'N/A',
+                  latestSupport: 'Latest Support: $latestSupport',
+                  imageUrl: orphanData['profileImageUrl'] ?? '',
                 );
               },
-            ),
+            );
+          } else {
+            return const SizedBox.shrink();
+          }
+        },
+      ),
     );
   }
 
@@ -403,7 +360,7 @@ class _OrphansListScreenState extends State<OrphansListScreen> {
                     Center(
                       child: ElevatedButton(
                         onPressed: () {
-                          _applyFilters();
+                          setState(() {});
                           Navigator.pop(context);
                         },
                         style: ElevatedButton.styleFrom(
@@ -416,6 +373,7 @@ class _OrphansListScreenState extends State<OrphansListScreen> {
                       child: TextButton(
                         onPressed: () {
                           _resetFilters();
+                          setState(() {});
                           Navigator.pop(context);
                         },
                         child: const Text('Reset Filters'),

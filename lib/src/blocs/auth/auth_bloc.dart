@@ -21,6 +21,15 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       }
     });
 
+    on<AppStarted>((event, emit) async {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        emit(AuthAuthenticated());
+      } else {
+        emit(AuthUnauthenticated());
+      }
+    });
+
     on<LoginButtonPressed>((event, emit) async {
       emit(AuthLoading());
       final error = await _authService.signIn(
@@ -45,19 +54,13 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         name: event.name,
         email: event.email,
         password: event.password,
-        role: event.userRole,
-        institutionId: event.institutionId,
+        address: event.address,
+        website: event.website,
+        headName: event.headName,
+        headEmail: event.headEmail,
+        headMobileNumber: event.headMobileNumber,
+        userRole: event.userRole,
       );
-      if (error == null) {
-        emit(AuthAuthenticated());
-      } else {
-        emit(AuthErrorState(message: error));
-      }
-    });
-
-    on<SignInWithGoogleButtonPressed>((event, emit) async {
-      emit(AuthLoading());
-      final error = await _authService.signInWithGoogle();
       if (error == null) {
         emit(AuthAuthenticated());
       } else {

@@ -38,32 +38,38 @@ class AuthService {
       final user = userCredential.user;
 
       if (user != null) {
-        // جلب بياناته من Firestore (kafala_heads / supervisors)
-        final existingUser = await _firestoreService.getUserData(user.uid);
-
-        if (existingUser == null) {
-          // في حالتنا: ما بننشئ مستخدم جديد أوتوماتيكياً
-          // لازم يكمّل التسجيل من شاشة تسجيل المؤسسة أو رئيس الكفالة
-          return 'الحساب غير مسجّل في النظام. الرجاء استكمال التسجيل.';
+        final userDoc = await _firestoreService.getUser(user.uid);
+        if (userDoc == null) {
+          // إذا كان المستخدم جديدًا، نقوم بإنشاء مستخدم جديد في Firestore
+          await _firestoreService.createUser(user.uid, {
+            'email': user.email,
+            'name': user.displayName,
+            'role': 'supervisor', // افتراضياً، دور المشرف
+          });
         }
       }
-
       return null;
-    } catch (e) {
-      return 'فشل في تسجيل الدخول بجوجل: $e';
+    } on FirebaseAuthException catch (e) {
+      return e.message;
     }
   }
 
-  /// تسجيل حساب جديد
-  /// userRole: 'kafala_head' أو 'supervisor'
-  /// لو أول تسجيل مؤسسة: institutionData مطلوب
+  // تسجيل الخروج
+  Future<void> signOut() async {
+    await _auth.signOut();
+  }
+
+  // تسجيل حساب جديد
   Future<String?> signUp({
     required String name,
     required String email,
     required String password,
-    required String role, // 'kafala_head' or 'supervisor'
-    Map<String, dynamic>? institutionData,
-    String? institutionId,
+    required String address,
+    required String website,
+    required String headName,
+    required String headEmail,
+    required String headMobileNumber,
+    required String userRole,
   }) async {
     try {
       final userCredential = await _auth.createUserWithEmailAndPassword(
@@ -74,41 +80,28 @@ class AuthService {
       final user = userCredential.user;
       if (user == null) return 'فشل إنشاء الحساب';
 
-      if (role == 'kafala_head') {
-        if (institutionData == null) {
-          return 'بيانات المؤسسة مطلوبة عند تسجيل رئيس قسم الكفالة';
-        }
-
-        final newInstitutionId = institutionId ?? user.uid;
-
-        await _firestoreService.initializeNewInstitution(
-          newInstitutionId,
-          {...institutionData, 'ownerEmail': email, 'ownerName': name},
-          {'uid': user.uid, 'name': name, 'email': email},
-        );
-      } else if (role == 'supervisor') {
-        if (institutionId == null) {
-          return 'institutionId مطلوب عند تسجيل مشرف جديد';
-        }
-
-        await _firestoreService.createSupervisor(institutionId, {
+      await _firestoreService.initializeNewInstitution(
+        user.uid,
+        {
+          'name': name,
+          'email': email,
+          'address': address,
+          'website': website,
+          'headName': headName,
+          'headEmail': headEmail,
+          'headMobileNumber': headMobileNumber,
+        },
+        {
           'uid': user.uid,
           'name': name,
           'email': email,
-        });
-      }
-
+          'userRole': userRole,
+          'institutionId': user.uid,
+        },
+      );
       return null;
     } on FirebaseAuthException catch (e) {
       return e.message;
-    } catch (e) {
-      return e.toString();
     }
-  }
-
-  // تسجيل الخروج
-  Future<void> signOut() async {
-    await _auth.signOut();
-    await _googleSignIn.signOut();
   }
 }
