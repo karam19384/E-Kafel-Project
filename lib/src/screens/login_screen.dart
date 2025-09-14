@@ -1,10 +1,9 @@
 // lib/src/screens/login_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:e_kafel/src/blocs/auth/auth_bloc.dart';
 import 'package:e_kafel/src/screens/home_screen.dart';
-import 'package:e_kafel/src/screens/signup_screen.dart'; // استيراد صفحة التسجيل
+import 'package:e_kafel/src/screens/signup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -14,9 +13,18 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _emailController = TextEditingController();
+  // تم تغيير اسم المتحكم إلى _loginIdentifierController
+  final _loginIdentifierController = TextEditingController();
   final _passwordController = TextEditingController();
-  bool _isPasswordVisible = false; // متغير لحالة إظهار/إخفاء كلمة المرور
+
+  bool _isPasswordVisible = false;
+
+  @override
+  void dispose() {
+    _loginIdentifierController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -28,115 +36,79 @@ class _LoginScreenState extends State<LoginScreen> {
               MaterialPageRoute(builder: (_) => const HomeScreen()),
             );
           } else if (state is AuthErrorState) {
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(SnackBar(content: Text(state.message)));
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(state.message)),
+            );
           }
         },
         child: BlocBuilder<AuthBloc, AuthState>(
           builder: (context, state) {
-            return Center(
+            return SingleChildScrollView(
               child: Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: SingleChildScrollView(
+                padding: const EdgeInsets.all(32.0),
+                child: Form(
                   child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // شعار التطبيق
-                      Container(
-                        width: 150,
-                        height: 150,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.grey.withOpacity(0.5),
-                              spreadRadius: 2,
-                              blurRadius: 5,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
-                        ),
-                        child: Center(
-                          child: Text(
-                            'e-Kafel',
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.teal[700],
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 48),
-                      // حقل البريد الإلكتروني
-                      TextField(
-                        controller: _emailController,
-                        decoration: const InputDecoration(
-                          labelText: 'User ID',
-                          border: OutlineInputBorder(),
-                        ),
+                      // حقل إدخال البريد الإلكتروني أو المعرف الفريد
+                      _buildInputField(
+                        controller: _loginIdentifierController,
+                        // تم تغيير التسمية لتعكس الدعم الجديد
+                        labelText: 'البريد الإلكتروني أو المعرف الفريد',
+                        keyboardType: TextInputType.emailAddress,
                       ),
                       const SizedBox(height: 16),
-                      // حقل كلمة المرور مع زر الإظهار/الإخفاء
-                      TextField(
+                      _buildInputField(
                         controller: _passwordController,
+                        labelText: 'كلمة المرور',
                         obscureText: !_isPasswordVisible,
-                        decoration: InputDecoration(
-                          labelText: 'Password',
-                          border: const OutlineInputBorder(),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _isPasswordVisible
-                                  ? Icons.visibility
-                                  : Icons.visibility_off,
-                            ),
-                            onPressed: () {
-                              setState(() {
-                                _isPasswordVisible = !_isPasswordVisible;
-                              });
-                            },
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _isPasswordVisible
+                                ? Icons.visibility
+                                : Icons.visibility_off,
+                            color: const Color(0xFF4C7F7F),
                           ),
+                          onPressed: () {
+                            setState(() {
+                              _isPasswordVisible = !_isPasswordVisible;
+                            });
+                          },
                         ),
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 32),
                       // زر تسجيل الدخول
-                      if (state is AuthLoading)
-                        const CircularProgressIndicator()
-                      else
-                        ElevatedButton(
-                          onPressed: () {
-                            context.read<AuthBloc>().add(
-                              LoginButtonPressed(
-                                email: _emailController.text.trim(),
-                                password: _passwordController.text.trim(),
-                              ),
-                            );
-                          },
-                          child: const Text('SIGN IN'),
-                        ),
+                      ElevatedButton(
+                        onPressed: state is AuthLoading
+                            ? null
+                            : () {
+                                context.read<AuthBloc>().add(
+                                      LoginButtonPressed(
+                                        // تم تمرير قيمة المتحكم الجديد
+                                        loginIdentifier:
+                                            _loginIdentifierController.text.trim(),
+                                        password: _passwordController.text.trim(),
+                                        email: _loginIdentifierController.text.trim(),
+                                      ),
+                                    );
+                              },
+                        child: const Text('تسجيل الدخول'),
+                      ),
                       const SizedBox(height: 16),
-                      // زر "Forget your password?"
                       TextButton(
-                        onPressed: () {
-                          // TODO: Implement forgot password functionality
-                        },
-                        child: const Text('Forget your password?'),
+                        onPressed: () {},
+                        child: const Text('نسيت كلمة المرور؟'),
                       ),
                       const SizedBox(height: 16),
                       const Divider(),
                       const SizedBox(height: 16),
-                      // زر "Add a new institution"
                       TextButton(
                         onPressed: () {
                           Navigator.of(context).push(
                             MaterialPageRoute(
-                              builder: (_) => const SignUpScreen(),
-                            ),
+                                builder: (_) => const SignUpScreen()),
                           );
                         },
-                        child: const Text('Add a new institution'),
+                        child: const Text('إضافة مؤسسة جديدة'),
                       ),
                     ],
                   ),
@@ -144,6 +116,34 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             );
           },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInputField({
+    required TextEditingController controller,
+    required String labelText,
+    TextInputType keyboardType = TextInputType.text,
+    bool obscureText = false,
+    Widget? suffixIcon,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFE0BBE4), width: 2),
+      ),
+      child: TextFormField(
+        controller: controller,
+        keyboardType: keyboardType,
+        obscureText: obscureText,
+        decoration: InputDecoration(
+          labelText: labelText,
+          labelStyle: const TextStyle(color: Color(0xFF4C7F7F)),
+          border: InputBorder.none,
+          suffixIcon: suffixIcon,
         ),
       ),
     );

@@ -33,7 +33,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<LoginButtonPressed>((event, emit) async {
       emit(AuthLoading());
       final error = await _authService.signIn(
-        email: event.email,
+        loginIdentifier: event.email, // تم تغيير اسم المتغير
         password: event.password,
       );
       if (error == null) {
@@ -59,7 +59,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         headName: event.headName,
         headEmail: event.headEmail,
         headMobileNumber: event.headMobileNumber,
-        userRole: event.userRole,
+        userRole: event.userRole, // تم تمرير الحقل الجديد
       );
       if (error == null) {
         emit(AuthAuthenticated());

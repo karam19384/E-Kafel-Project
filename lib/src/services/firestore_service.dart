@@ -6,10 +6,10 @@ class FirestoreService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   // ========== Utils ==========
-  String _generateCustomId() {
+  String generateCustomId() {
     final random = Random();
-    const min = 10000000;
-    const max = 99999999;
+    const min = 100000;
+    const max = 999999;
     return (min + random.nextInt(max - min)).toString();
   }
 
@@ -32,10 +32,10 @@ class FirestoreService {
     }
   }
 
-// ========== Users ==========
+  // ========== Users ==========
   Future<DocumentSnapshot?> getUser(String uid) async {
     try {
-      final doc = await _firestore.collection('users').doc(uid).get();
+      final doc = await _firestore.collection('kafala_heads').doc(uid).get();
       return doc.exists ? doc : null;
     } catch (e) {
       print('Error getting user: $e');
@@ -43,8 +43,32 @@ class FirestoreService {
     }
   }
 
-  Future<void> createUser(String uid, Map<String, dynamic> userData) async {
-    await _firestore.collection('users').doc(uid).set(userData);
+  // البحث عن المستخدم باستخدام المعرف الفريد
+  Future<DocumentSnapshot?> getUserByCustomId(String customId) async {
+    try {
+      final querySnapshot = await _firestore
+          .collection('kafala_heads')
+          .where('customId', isEqualTo: customId)
+          .limit(1)
+          .get();
+      if (querySnapshot.docs.isNotEmpty) {
+        return querySnapshot.docs.first;
+      }
+      return null;
+    } catch (e) {
+      print('Error getting user by customId: $e');
+      return null;
+    }
+  }
+
+  // إضافة حقل customId إلى البيانات التي يتم حفظها
+  Future<void> createUser(String uid, Map<String, dynamic> data) async {
+    try {
+      final userRef = _firestore.collection('kafala_heads').doc(uid);
+      await userRef.set(data);
+    } catch (e) {
+      print('Error creating user: $e');
+    }
   }
 
   // ========== Institutions ==========
@@ -57,21 +81,29 @@ class FirestoreService {
         .collection('institutions')
         .doc(institutionId);
     final kafalaHeadUid = kafalaHeadData['uid'] as String?;
-    
-    // إنشاء ملف المؤسسة
-    await institutionRef.set({
+
+    if (kafalaHeadUid == null) {
+      throw ArgumentError("uid is required on kafalaHeadData.");
+    }
+
+    final batch = _firestore.batch();
+    batch.set(institutionRef, {
       ...institutionData,
       'createdAt': FieldValue.serverTimestamp(),
     });
 
-    // إنشاء ملف المستخدم (رئيس الكفالة) وربطه بالمؤسسة
-    if (kafalaHeadUid != null) {
-      await _firestore.collection('users').doc(kafalaHeadUid).set({
-        ...kafalaHeadData,
-        'institutionId': institutionId,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-    }
+    // استخدم UID الخاص برئيس القسم كـ Document ID
+    final kafalaHeadRef = _firestore
+        .collection('kafala_heads')
+        .doc(kafalaHeadUid);
+    batch.set(kafalaHeadRef, {
+      ...kafalaHeadData,
+      'userRole': 'kafala_head',
+      'institutionId': institutionId,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+
+    await batch.commit();
   }
 
   // ========== Supervisors ==========
@@ -112,7 +144,7 @@ class FirestoreService {
     if (sup.exists) return sup.data();
     return null;
   }
- 
+
   Future<int?> getTasksCount(String institutionId) async {
     try {
       final querySnapshot = await _firestore
@@ -126,7 +158,8 @@ class FirestoreService {
       return 0;
     }
   }
-  // ==========  ==========\
+
+  // ==========  Dashboard Stats  ==========\
   Future<Map<String, dynamic>> getDashboardStats(String institutionId) async {
     return _firestore.runTransaction<Map<String, dynamic>>((tx) async {
       // Queries for counts
@@ -256,7 +289,7 @@ class FirestoreService {
     }
   }
 
-  // ========== Notifications (ديناميكية بالكامل) ==========
+  // ========== Notifications ==========
   Future<List<Map<String, dynamic>>> getNotifications(String uid) async {
     try {
       final snapshot = await _firestore
@@ -366,42 +399,43 @@ class FirestoreService {
     return query.orderBy('createdAt', descending: true);
   }
 
-  Future<String?> addOrphan(Map<String, dynamic> orphanData) async {
-    try {
-      _ensureHasInstitutionId(orphanData);
-      final ref = _firestore.collection('orphans').doc();
-      final id = ref.id;
+Future<String?> addOrphan({
+  required Map<String, dynamic> orphanData,
+  required String institutionId, // 👈 إضافة هذا المتغير
+}) async {
+  try {
+    final ref = _firestore.collection('orphans').doc();
+    final id = ref.id;
 
-      // توليد مصفوفة Keywords للبحث المتقدم
-      List<String> keywords = [];
-      if (orphanData['name'] != null) {
-        keywords.addAll(_generateSearchKeywords(orphanData['name']));
-      }
-      if (orphanData['orphanIdNumber'] != null) {
-        keywords.add(orphanData['orphanIdNumber'].toString());
-      }
-      if (orphanData['deceasedName'] != null) {
-        keywords.addAll(_generateSearchKeywords(orphanData['deceasedName']));
-      }
-      if (orphanData['breadwinnerName'] != null) {
-        keywords.addAll(_generateSearchKeywords(orphanData['breadwinnerName']));
-      }
-      orphanData['searchKeywords'] = keywords;
-
-      await ref.set({
-        ...orphanData,
-        'orphanId': id,
-        'createdAt': FieldValue.serverTimestamp(),
-        'isDataComplete': orphanData['isDataComplete'] ?? false,
-        'isArchived': orphanData['isArchived'] ?? false,
-      });
-      return id;
-    } catch (e) {
-      print('Error adding orphan: $e');
-      return null;
+    List<String> keywords = [];
+    if (orphanData['name'] != null) {
+      keywords.addAll(_generateSearchKeywords(orphanData['name']));
     }
-  }
+    if (orphanData['orphanIdNumber'] != null) {
+      keywords.add(orphanData['orphanIdNumber'].toString());
+    }
+    if (orphanData['deceasedName'] != null) {
+      keywords.addAll(_generateSearchKeywords(orphanData['deceasedName']));
+    }
+    if (orphanData['breadwinnerName'] != null) {
+      keywords.addAll(_generateSearchKeywords(orphanData['breadwinnerName']));
+    }
+    orphanData['searchKeywords'] = keywords;
 
+    await ref.set({
+      ...orphanData,
+      'institutionId': institutionId, 
+      'orphanId': id,
+      'createdAt': FieldValue.serverTimestamp(),
+      'isDataComplete': orphanData['isDataComplete'] ?? false,
+      'isArchived': orphanData['isArchived'] ?? false,
+    });
+    return id;
+  } catch (e) {
+    print('Error adding orphan: $e');
+    return null;
+  }
+}
   Future<bool> updateOrphan(
     String orphanId,
     Map<String, dynamic> updateData,

@@ -22,6 +22,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _headMobileNumberController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _userRole = 'kafala_head';
 
   final _formKey = GlobalKey<FormState>();
 
@@ -45,18 +46,18 @@ class _SignUpScreenState extends State<SignUpScreen> {
   void _onSignUp() {
     if (_formKey.currentState!.validate()) {
       context.read<AuthBloc>().add(
-            SignUpButtonPressed(
-              name: _institutionNameController.text.trim(),
-              email: _institutionEmailController.text.trim(),
-              password: _passwordController.text.trim(),
-              address: _institutionAddressController.text.trim(),
-              website: _institutionWebsiteController.text.trim(),
-              headName: _headNameController.text.trim(),
-              headEmail: _headEmailController.text.trim(),
-              headMobileNumber: _headMobileNumberController.text.trim(),
-              userRole: 'kafala_head',
-            ),
-          );
+        SignUpButtonPressed(
+          name: _institutionNameController.text.trim(),
+          email: _institutionEmailController.text.trim(),
+          password: _passwordController.text.trim(),
+          address: _institutionAddressController.text.trim(),
+          website: _institutionWebsiteController.text.trim(),
+          headName: _headNameController.text.trim(),
+          headEmail: _headEmailController.text.trim(),
+          headMobileNumber: _headMobileNumberController.text.trim(),
+          userRole: 'kafala_head',
+        ),
+      );
     }
   }
 
@@ -70,9 +71,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
               MaterialPageRoute(builder: (_) => const HomeScreen()),
             );
           } else if (state is AuthErrorState) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(state.message)),
-            );
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text(state.message)));
           }
         },
         child: BlocBuilder<AuthBloc, AuthState>(
@@ -182,7 +183,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           },
                           suffixIcon: IconButton(
                             icon: Icon(
-                              _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                              _obscurePassword
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
                               color: const Color(0xFF4C7F7F),
                             ),
                             onPressed: () {
@@ -205,12 +208,15 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           },
                           suffixIcon: IconButton(
                             icon: Icon(
-                              _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
+                              _obscureConfirmPassword
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
                               color: const Color(0xFF4C7F7F),
                             ),
                             onPressed: () {
                               setState(() {
-                                _obscureConfirmPassword = !_obscureConfirmPassword;
+                                _obscureConfirmPassword =
+                                    !_obscureConfirmPassword;
                               });
                             },
                           ),
@@ -218,27 +224,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         const SizedBox(height: 24),
                         // زر التسجيل
                         ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFE0BBE4), // لون خلفية الزر
-                            foregroundColor: Colors.white, // لون النص
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 15),
-                          ),
-                          onPressed: _onSignUp,
+                          onPressed: state is AuthLoading ? null : _onSignUp,
                           child: state is AuthLoading
-                              ? const CircularProgressIndicator(
-                                  color: Colors.white,
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
                                 )
-                              : const Text(
-                                  'SIGN UP',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                  ),
-                                ),
+                              : const Text('SIGN UP'),
                         ),
                       ],
                     ),

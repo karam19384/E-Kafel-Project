@@ -323,14 +323,11 @@ class _HomeScreenState extends State<HomeScreen> {
                                         color: Colors.lightGreen,
                                         icon: Icons.people,
                                         onTap: () {
-                                          Navigator.pop(context);
-                                          Navigator.pushReplacement(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (context) =>
-                                                  const OrphansListScreen(),
-                                            ),
-                                          );
+                                         Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) => OrphansListScreen(),
+                                ),
+                              );
                                         },
                                       ),
                                     ),
@@ -341,14 +338,11 @@ class _HomeScreenState extends State<HomeScreen> {
                                         color: Colors.orange,
                                         icon: Icons.person_off,
                                         onTap: () {
-                                          Navigator.pop(context);
-                                          Navigator.pushReplacement(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (context) =>
-                                                  const OrphansListScreen(),
-                                            ),
-                                          );
+                                           Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) => OrphansListScreen(),
+                                ),
+                              );
                                         },
                                       ),
                                     ),
@@ -364,14 +358,11 @@ class _HomeScreenState extends State<HomeScreen> {
                                         color: Colors.blue,
                                         icon: Icons.favorite,
                                         onTap: () {
-                                          Navigator.pop(context);
-                                          Navigator.pushReplacement(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (context) =>
-                                                  const OrphansListScreen(),
-                                            ),
-                                          );
+                                         Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) => OrphansListScreen(),
+                                ),
+                              );
                                         },
                                       ),
                                     ),
@@ -382,14 +373,11 @@ class _HomeScreenState extends State<HomeScreen> {
                                         color: Colors.purple,
                                         icon: Icons.assignment_turned_in,
                                         onTap: () {
-                                          Navigator.pop(context);
-                                          Navigator.pushReplacement(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (context) =>
-                                                  const TasksScreen(),
-                                            ),
-                                          );
+                                         Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) => TasksScreen(),
+                                ),
+                              );
                                         },
                                       ),
                                     ),
@@ -400,8 +388,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                         color: Colors.red,
                                         icon: Icons.person_outline,
                                         onTap: () {
-                                          Navigator.pushReplacement(
-                                            context,
+                                          Navigator.of(context).push(
                                             MaterialPageRoute(
                                               builder: (context) =>
                                                   const SupervisorsScreen(),

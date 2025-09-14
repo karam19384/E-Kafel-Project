@@ -1,13 +1,11 @@
 // ignore_for_file: unused_local_variable
 
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:flutter/foundation.dart'; // Import this for kIsWeb
-
+import 'package:flutter/foundation.dart';
 import '../../models/orphan_model.dart';
 part 'orphans_event.dart';
 part 'orphans_state.dart';
@@ -43,6 +41,7 @@ class OrphansBloc extends Bloc<OrphansEvent, OrphansState> {
         String? idCardUrl;
         String? deathCertificateUrl;
         String? orphanPhotoUrl;
+        String? institutionId;
 
         // رفع بطاقة الهوية
         if (kIsWeb) {
@@ -100,18 +99,19 @@ class OrphansBloc extends Bloc<OrphansEvent, OrphansState> {
             orphanPhotoUrl = await ref.getDownloadURL();
           }
         }
-            //  توليد رقم يتيم فريد تلقائياً
+        //  توليد رقم يتيم فريد تلقائياً
         final orphanNo = firestore.collection('orphans').doc().id;
 
         // تجهيز بيانات اليتيم كـ Map باستخدام وظيفة toMap()
         final orphanData = event.orphan
             .copyWith(
+              institutionId: institutionId,
               idCardUrl: idCardUrl,
               deathCertificateUrl: deathCertificateUrl,
               orphanPhotoUrl: orphanPhotoUrl,
               createdAt: DateTime.now(),
               updatedAt: DateTime.now(),
-              orphanNo: orphanNo, 
+              orphanNo: orphanNo,
             )
             .toMap();
 

@@ -9,7 +9,6 @@ abstract class AuthEvent extends Equatable {
   List<Object?> get props => [];
 }
 
-
 class CheckAuthStatus extends AuthEvent {}
 
 class AppStarted extends AuthEvent {}
@@ -17,8 +16,13 @@ class AppStarted extends AuthEvent {}
 class LoginButtonPressed extends AuthEvent {
   final String email;
   final String password;
+  final String loginIdentifier;
 
-  const LoginButtonPressed({required this.email, required this.password});
+  const LoginButtonPressed({
+    required this.email,
+    required this.password,
+    required this.loginIdentifier,
+  });
 
   @override
   List<Object> get props => [email, password];
@@ -35,8 +39,7 @@ class SignUpButtonPressed extends AuthEvent {
   final String headName;
   final String headEmail;
   final String headMobileNumber;
-    final String userRole;
-
+  final String userRole;
 
   const SignUpButtonPressed({
     required this.name,
@@ -47,26 +50,21 @@ class SignUpButtonPressed extends AuthEvent {
     required this.headName,
     required this.headEmail,
     required this.headMobileNumber,
-        required this.userRole,
-
+    required this.userRole,
   });
 
   @override
   List<Object?> get props => [
-        name,
-        email,
-        password,
-        address,
-        website,
-        headName,
-        headEmail,
-        headMobileNumber,
-        userRole,
-      ];
+    name,
+    email,
+    password,
+    address,
+    website,
+    headName,
+    headEmail,
+    headMobileNumber,
+    userRole,
+  ];
 }
 
-
 class SignInWithGoogleButtonPressed extends AuthEvent {}
-
-
-

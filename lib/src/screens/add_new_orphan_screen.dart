@@ -8,7 +8,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../blocs/orphans/orphans_bloc.dart';
 import 'package:intl/intl.dart';
-import '../blocs/home/home_bloc.dart'; // ✅ تم استيراد HomeBloc
+import '../blocs/home/home_bloc.dart'; 
 
 class AddNewOrphanScreen extends StatefulWidget {
   static const routeName = '/add-orphan';
@@ -193,6 +193,7 @@ class _AddNewOrphanScreenState extends State<AddNewOrphanScreen> {
 
     context.read<OrphansBloc>().add(
           AddOrphan(
+            
             orphan: orphan,
             idCardFile: _idCardFile,
             deathCertificateFile: _deathCertificateFile,
