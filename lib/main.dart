@@ -9,10 +9,9 @@ import 'package:e_kafel/src/screens/login_screen.dart';
 import 'package:e_kafel/src/screens/home_screen.dart';
 import 'package:e_kafel/src/services/auth_service.dart';
 import 'package:e_kafel/src/services/firestore_service.dart';
-import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 import 'src/blocs/orphans/orphans_bloc.dart';
-import 'src/providers/visit_provider.dart';
+import 'src/blocs/visit/visit_bloc.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -36,7 +35,8 @@ class MyApp extends StatelessWidget {
         BlocProvider<OrphansBloc>(
           create: (_) => OrphansBloc(firestore: FirebaseFirestore.instance),
         ),
-        ChangeNotifierProvider(create: (ctx) => VisitProvider()),
+            BlocProvider<VisitBloc>(create: (context) => VisitBloc(firestoreService)), 
+
       ],
       child: MaterialApp(
         title: 'E-Kafel App',

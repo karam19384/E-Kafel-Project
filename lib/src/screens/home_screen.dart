@@ -26,6 +26,39 @@ class _HomeScreenState extends State<HomeScreen> {
     context.read<HomeBloc>().add(LoadHomeData());
   }
 
+  void _showNotificationsPopup(List<Map<String, dynamic>> notifications) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('الإشعارات'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: notifications.length,
+              itemBuilder: (context, index) {
+                final notification = notifications[index];
+                return ListTile(
+                  title: Text(notification['title'] ?? 'لا يوجد عنوان'),
+                  subtitle: Text(notification['body'] ?? 'لا يوجد محتوى'),
+                );
+              },
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('إغلاق'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Widget _buildDashboardCard({
     required String title,
     required int count,
@@ -162,8 +195,8 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return BlocConsumer<AuthBloc, AuthState>(
-      listener: (context, state) {
-        if (state is AuthUnauthenticated) {
+      listener: (context, authState) {
+        if (authState is AuthUnauthenticated) {
           Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute(builder: (context) => const LoginScreen()),
             (Route<dynamic> route) => false,
@@ -223,7 +256,12 @@ class _HomeScreenState extends State<HomeScreen> {
                                           ),
                                         ),
                                         Text(
-                                          '${state.userRole} في الميدان',
+                                        (state.userRole == 'kafala_head')
+                                            ? 'رئيس كفالة'
+                                            : (state.userRole == 'supervisor')
+                                                ? 'مشرف'
+                                                : 'دور المستخدم غير معروف',
+                                         
                                           style: TextStyle(
                                             color: Colors.white.withOpacity(
                                               0.8,
@@ -236,7 +274,11 @@ class _HomeScreenState extends State<HomeScreen> {
                                     Row(
                                       children: [
                                         IconButton(
-                                          onPressed: () {},
+                                          onPressed: () {
+                                            _showNotificationsPopup(
+                                              state.notifications,
+                                            );
+                                          },
                                           icon: const Icon(
                                             Icons.notifications_none,
                                             color: Colors.white,
@@ -323,11 +365,12 @@ class _HomeScreenState extends State<HomeScreen> {
                                         color: Colors.lightGreen,
                                         icon: Icons.people,
                                         onTap: () {
-                                         Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (context) => OrphansListScreen(),
-                                ),
-                              );
+                                          Navigator.of(context).push(
+                                            MaterialPageRoute(
+                                              builder: (context) =>
+                                                  OrphansListScreen(),
+                                            ),
+                                          );
                                         },
                                       ),
                                     ),
@@ -338,11 +381,12 @@ class _HomeScreenState extends State<HomeScreen> {
                                         color: Colors.orange,
                                         icon: Icons.person_off,
                                         onTap: () {
-                                           Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (context) => OrphansListScreen(),
-                                ),
-                              );
+                                          Navigator.of(context).push(
+                                            MaterialPageRoute(
+                                              builder: (context) =>
+                                                  OrphansListScreen(),
+                                            ),
+                                          );
                                         },
                                       ),
                                     ),
@@ -358,11 +402,12 @@ class _HomeScreenState extends State<HomeScreen> {
                                         color: Colors.blue,
                                         icon: Icons.favorite,
                                         onTap: () {
-                                         Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (context) => OrphansListScreen(),
-                                ),
-                              );
+                                          Navigator.of(context).push(
+                                            MaterialPageRoute(
+                                              builder: (context) =>
+                                                  OrphansListScreen(),
+                                            ),
+                                          );
                                         },
                                       ),
                                     ),
@@ -373,11 +418,12 @@ class _HomeScreenState extends State<HomeScreen> {
                                         color: Colors.purple,
                                         icon: Icons.assignment_turned_in,
                                         onTap: () {
-                                         Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (context) => TasksScreen(),
-                                ),
-                              );
+                                          Navigator.of(context).push(
+                                            MaterialPageRoute(
+                                              builder: (context) =>
+                                                  TasksScreen(),
+                                            ),
+                                          );
                                         },
                                       ),
                                     ),
@@ -508,8 +554,8 @@ class _HomeScreenState extends State<HomeScreen> {
             userRole: state.userRole,
             profileImageUrl: state.profileImageUrl,
             orphanCount: state.totalOrphans,
-            taskCount: state.completedTasks,
-            visitCount: state.completedFieldVisits,
+            taskCount: state.totalTasks,
+            visitCount: state.totalVisits,
             onLogout: () {
               context.read<AuthBloc>().add(LogoutButtonPressed());
               Navigator.of(context).pushAndRemoveUntil(

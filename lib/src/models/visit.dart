@@ -4,12 +4,14 @@ class Visit {
   final String orphanName;
   final String date;
   final String area;
+  final String? status; // ✅ أضف هذا الحقل
 
   Visit({
     this.id,
     required this.orphanName,
     required this.date,
     required this.area,
+    this.status, // ✅ أضف هذا الحقل
   });
 
   Map<String, dynamic> toMap() {
@@ -17,6 +19,7 @@ class Visit {
       'orphanName': orphanName,
       'date': date,
       'area': area,
+      'status': status, // ✅ أضف هذا الحقل
     };
   }
 
@@ -26,6 +29,7 @@ class Visit {
       orphanName: map['orphanName'] ?? '',
       date: map['date'] ?? '',
       area: map['area'] ?? '',
+      status: map['status'] ?? '', // ✅ أضف هذا الحقل
     );
   }
 }

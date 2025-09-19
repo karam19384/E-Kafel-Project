@@ -28,7 +28,7 @@ class HomeLoaded extends HomeState {
   final int totalOrphans;
   final int completedTasks;
   final int totalVisits;
-  final int totalTasks; // ✅ إضافة حقل totalTasks هنا
+  final int totalTasks; 
 
   const HomeLoaded({
     required this.userName,
@@ -45,7 +45,7 @@ class HomeLoaded extends HomeState {
     required this.totalOrphans,
     required this.completedTasks,
     required this.totalVisits,
-    required this.totalTasks, // ✅ وإضافته هنا
+    required this.totalTasks, 
   });
 
   @override
@@ -64,7 +64,7 @@ class HomeLoaded extends HomeState {
         totalOrphans,
         completedTasks,
         totalVisits,
-        totalTasks, // ✅ وإضافته هنا
+        totalTasks, 
       ];
 }
 

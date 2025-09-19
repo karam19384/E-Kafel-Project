@@ -32,13 +32,14 @@ class _LoginScreenState extends State<LoginScreen> {
       body: BlocListener<AuthBloc, AuthState>(
         listener: (context, state) {
           if (state is AuthAuthenticated) {
+              print("User role: ${state.userRole}");
             Navigator.of(context).pushReplacement(
               MaterialPageRoute(builder: (_) => const HomeScreen()),
             );
           } else if (state is AuthErrorState) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(state.message)),
-            );
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text(state.message)));
           }
         },
         child: BlocBuilder<AuthBloc, AuthState>(
@@ -82,14 +83,15 @@ class _LoginScreenState extends State<LoginScreen> {
                             ? null
                             : () {
                                 context.read<AuthBloc>().add(
-                                      LoginButtonPressed(
-                                        // تم تمرير قيمة المتحكم الجديد
-                                        loginIdentifier:
-                                            _loginIdentifierController.text.trim(),
-                                        password: _passwordController.text.trim(),
-                                        email: _loginIdentifierController.text.trim(),
-                                      ),
-                                    );
+                                  LoginButtonPressed(
+                                    loginIdentifier: _loginIdentifierController
+                                        .text
+                                        .trim(),
+                                    password: _passwordController.text.trim(),
+                                    email: _loginIdentifierController.text
+                                        .trim(),
+                                  ),
+                                );
                               },
                         child: const Text('تسجيل الدخول'),
                       ),
@@ -105,7 +107,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         onPressed: () {
                           Navigator.of(context).push(
                             MaterialPageRoute(
-                                builder: (_) => const SignUpScreen()),
+                              builder: (_) => const SignUpScreen(),
+                            ),
                           );
                         },
                         child: const Text('إضافة مؤسسة جديدة'),

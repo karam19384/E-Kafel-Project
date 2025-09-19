@@ -194,7 +194,7 @@ class _OrphansListScreenState extends State<OrphansListScreen> {
                 }
                 return _buildOrphanCard(
                   name: orphanData['name'] ?? 'Unknown',
-                  phone: orphanData['guardianPhone'] ?? 'N/A',
+                  phone: orphanData['mobileNumber'] ?? 'N/A',
                   latestSupport: 'Latest Support: $latestSupport',
                   imageUrl: orphanData['profileImageUrl'] ?? '',
                 );

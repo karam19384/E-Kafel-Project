@@ -1,10 +1,12 @@
+// lib/src/screens/field_visits_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:e_kafel/src/blocs/home/home_bloc.dart';
+import 'package:e_kafel/src/blocs/visit/visit_bloc.dart';
 import 'package:e_kafel/src/themes/app_colors.dart';
 import 'package:e_kafel/src/widgets/app_drawer.dart';
-import 'package:e_kafel/src/blocs/auth/auth_bloc.dart';
 
+import '../blocs/auth/auth_bloc.dart';
 import 'login_screen.dart';
 
 class FieldVisitsScreen extends StatefulWidget {
@@ -14,401 +16,373 @@ class FieldVisitsScreen extends StatefulWidget {
   State<FieldVisitsScreen> createState() => _FieldVisitsScreenState();
 }
 
-class _FieldVisitsScreenState extends State<FieldVisitsScreen> {
+class _FieldVisitsScreenState extends State<FieldVisitsScreen>
+    with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
-  final _descriptionController = TextEditingController();
   final _addressController = TextEditingController();
   DateTime _selectedDate = DateTime.now();
   TimeOfDay _selectedTime = TimeOfDay.now();
-  // ignore: unused_field
-  final String _selectedStatus = 'مجدولة';
+  late TabController _tabController;
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('الزيارات الميدانية'),
-        backgroundColor: AppColors.primaryColor,
-        elevation: 0,
-      ),
-      drawer: BlocBuilder<HomeBloc, HomeState>(
-        builder: (context, state) {
-          if (state is HomeLoaded) {
-            return AppDrawer(
-              userName: state.userName,
-              userRole: state.userRole,
-              profileImageUrl: state.profileImageUrl,
-              orphanCount: state.orphanSponsored,
-              taskCount: state.completedTasksPercentage
-                  .toInt(), // عدلها حسب المتغير المناسب
-              visitCount: state.completedFieldVisits
-                  .toInt(), // عدلها حسب المتغير المناسب
-              onLogout: () {
-                context.read<AuthBloc>().add(LogoutButtonPressed());
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (context) => const LoginScreen()),
-                  (Route<dynamic> route) => false,
-                );
-              },
-            );
-          }
-          return AppDrawer(
-            userName: '',
-            userRole: '',
-            orphanCount: 0,
-            taskCount: 0,
-            visitCount: 0,
-            onLogout: () {
-              Navigator.pop(context);
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const LoginScreen()),
-              );
-            },
-          );
-        },
-      ),
-
-      body: BlocBuilder<HomeBloc, HomeState>(
-        builder: (context, state) {
-          if (state is HomeLoading) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (state is HomeLoaded) {
-            return _buildFieldVisitsContent(context, state);
-          }
-
-          return const Center(child: Text('لا توجد بيانات متاحة'));
-        },
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _showAddVisitDialog,
-        backgroundColor: AppColors.primaryColor,
-        child: const Icon(Icons.add, color: Colors.white),
-      ),
-    );
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+     final homeState = context.read<HomeBloc>().state;
+    if (homeState is HomeLoaded) {
+      _loadAllVisits(homeState.institutionId);
+    }
   }
 
-  Widget _buildFieldVisitsContent(BuildContext context, HomeState state) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // إحصائيات الزيارات
-          _buildVisitStats(state),
-          const SizedBox(height: 24),
-
-          // قائمة الزيارات
-          _buildVisitsList(),
-        ],
-      ),
-    );
+  void _loadAllVisits(String institutionId) {
+    final homeState = context.read<HomeBloc>().state;
+    if (homeState is HomeLoaded) {
+      context
+          .read<VisitBloc>()
+          .add(LoadAllVisits(institutionId: homeState.institutionId));
+    }
   }
 
-  Widget _buildVisitStats(HomeState state) {
-    return Card(
-      elevation: 4,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'إحصائيات الزيارات',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: AppColors.primaryColor,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildStatItem(
-                    'إجمالي الزيارات',
-                    '25',
-                    Icons.visibility,
-                    AppColors.primaryColor,
-                  ),
-                ),
-                Expanded(
-                  child: _buildStatItem(
-                    'مكتملة',
-                    '18',
-                    Icons.check_circle,
-                    Colors.green,
-                  ),
-                ),
-                Expanded(
-                  child: _buildStatItem(
-                    'مجدولة',
-                    '7',
-                    Icons.schedule,
-                    Colors.orange,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatItem(
-    String title,
-    String value,
-    IconData icon,
-    Color color,
-  ) {
-    return Column(
-      children: [
-        Icon(icon, size: 40, color: color),
-        const SizedBox(height: 8),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
-        ),
-        Text(
-          title,
-          textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 12),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildVisitsList() {
-    return Card(
-      elevation: 4,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'الزيارات المجدولة',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: AppColors.primaryColor,
-              ),
-            ),
-            const SizedBox(height: 16),
-            _buildVisitItem(
-              'زيارة دار الأيتام A',
-              '2024-01-15',
-              '10:00 ص',
-              'مجدولة',
-              Icons.schedule,
-              Colors.orange,
-            ),
-            _buildVisitItem(
-              'زيارة يتيم B',
-              '2024-01-16',
-              '2:00 م',
-              'مكتملة',
-              Icons.check_circle,
-              Colors.green,
-            ),
-            _buildVisitItem(
-              'زيارة دار الأيتام C',
-              '2024-01-17',
-              '9:00 ص',
-              'مجدولة',
-              Icons.schedule,
-              Colors.orange,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildVisitItem(
-    String title,
-    String date,
-    String time,
-    String status,
-    IconData icon,
-    Color color,
-  ) {
-    return ListTile(
-      leading: Icon(icon, color: color, size: 30),
-      title: Text(title),
-      subtitle: Text('$date - $time'),
-      trailing: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.2),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Text(
-          status,
-          style: TextStyle(
-            color: color,
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
-      onTap: () => _showVisitDetails(title, date, time, status),
-    );
-  }
-
-  void _showAddVisitDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('إضافة زيارة ميدانية جديدة'),
-        content: Form(
-          key: _formKey,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: _titleController,
-                  decoration: const InputDecoration(
-                    labelText: 'عنوان الزيارة',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'يرجى إدخال عنوان الزيارة';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _descriptionController,
-                  decoration: const InputDecoration(
-                    labelText: 'وصف الزيارة',
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 3,
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _addressController,
-                  decoration: const InputDecoration(
-                    labelText: 'عنوان الزيارة',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: _selectDate,
-                        icon: const Icon(Icons.calendar_today),
-                        label: const Text('اختيار التاريخ'),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: _selectTime,
-                        icon: const Icon(Icons.access_time),
-                        label: const Text('اختيار الوقت'),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('إلغاء'),
-          ),
-          ElevatedButton(
-            onPressed: _saveVisit,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryColor,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('حفظ'),
-          ),
-        ],
-      ),
-    );
+  @override
+  void dispose() {
+    _tabController.dispose();
+    _titleController.dispose();
+    _addressController.dispose();
+    super.dispose();
   }
 
   void _selectDate() async {
-    final DateTime? picked = await showDatePicker(
+    final pickedDate = await showDatePicker(
       context: context,
       initialDate: _selectedDate,
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 365)),
     );
-    if (picked != null && picked != _selectedDate) {
-      setState(() {
-        _selectedDate = picked;
-      });
-    }
+    if (pickedDate != null) setState(() => _selectedDate = pickedDate);
   }
 
   void _selectTime() async {
-    final TimeOfDay? picked = await showTimePicker(
+    final pickedTime = await showTimePicker(
       context: context,
       initialTime: _selectedTime,
     );
-    if (picked != null && picked != _selectedTime) {
-      setState(() {
-        _selectedTime = picked;
-      });
-    }
+    if (pickedTime != null) setState(() => _selectedTime = pickedTime);
   }
 
-  void _saveVisit() {
+void _saveVisit() {
     if (_formKey.currentState!.validate()) {
-      // حفظ الزيارة في قاعدة البيانات
-      Navigator.of(context).pop();
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('تم حفظ الزيارة بنجاح')));
-    }
-  }
+      final finalDate = DateTime(
+        _selectedDate.year,
+        _selectedDate.month,
+        _selectedDate.day,
+        _selectedTime.hour,
+        _selectedTime.minute,
+      );
 
-  void _showVisitDetails(
-    String title,
-    String date,
-    String time,
-    String status,
-  ) {
+      final homeState = context.read<HomeBloc>().state;
+      if (homeState is HomeLoaded) {
+        final institutionId = homeState.institutionId; 
+        context.read<VisitBloc>().add(AddVisit(
+              date: finalDate,
+              name: _titleController.text,
+              location: _addressController.text,
+              institutionId: institutionId,
+            ));
+      }
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('تم حفظ الزيارة بنجاح')));
+    }
+}
+
+  
+void _showUpdateDialog(Map<String, dynamic> visit) {
+    _titleController.text = visit['name'];
+    _addressController.text = visit['location'];
+    final visitDateTime = DateTime.parse(visit['date']);
+    _selectedDate = visitDateTime;
+    _selectedTime = TimeOfDay.fromDateTime(visitDateTime);
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('التاريخ: $date'),
-            Text('الوقت: $time'),
-            Text('الحالة: $status'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('إغلاق'),
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('تعديل الزيارة'),
+          content: SingleChildScrollView(
+            child: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: _titleController,
+                    decoration: const InputDecoration(labelText: 'عنوان الزيارة'),
+                    validator: (value) => value!.isEmpty ? 'لا يمكن أن يكون العنوان فارغًا' : null,
+                  ),
+                  TextFormField(
+                    controller: _addressController,
+                    decoration: const InputDecoration(labelText: 'موقع الزيارة'),
+                    validator: (value) => value!.isEmpty ? 'لا يمكن أن يكون الموقع فارغًا' : null,
+                  ),
+                  ListTile(
+                    title: Text("التاريخ: ${_selectedDate.toLocal().toString().split(' ')[0]}"),
+                    trailing: const Icon(Icons.keyboard_arrow_down),
+                    onTap: _selectDate,
+                  ),
+                  ListTile(
+                    title: Text("الوقت: ${_selectedTime.format(context)}"),
+                    trailing: const Icon(Icons.keyboard_arrow_down),
+                    onTap: _selectTime,
+                  ),
+                ],
+              ),
+            ),
           ),
-        ],
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('إلغاء'),
+            ),
+            if (visit['status'] == 'مجدولة')
+              TextButton(
+                onPressed: () {
+                  final homeState = context.read<HomeBloc>().state;
+                  if (homeState is HomeLoaded) {
+                    context.read<VisitBloc>().add(
+                          UpdateVisit(
+                            id: visit['id'],
+                            updates: {
+                              'status': 'مكتملة',
+                              'name': visit['name'],
+                            },
+                            institutionId: homeState.institutionId, // ✅ إضافة الـ ID
+                          ),
+                        );
+                  }
+                  Navigator.of(context).pop();
+                },
+                child: const Text('تمت الزيارة'),
+              ),
+            ElevatedButton(
+              onPressed: () {
+                if (_formKey.currentState!.validate()) {
+                  final finalDate = DateTime(
+                    _selectedDate.year,
+                    _selectedDate.month,
+                    _selectedDate.day,
+                    _selectedTime.hour,
+                    _selectedTime.minute,
+                  );
+                  final homeState = context.read<HomeBloc>().state;
+                  if (homeState is HomeLoaded) {
+                    context.read<VisitBloc>().add(
+                          UpdateVisit(
+                            id: visit['id'],
+                            updates: {
+                              'name': _titleController.text,
+                              'location': _addressController.text,
+                              'date': finalDate.toIso8601String(),
+                            },
+                            institutionId: homeState.institutionId, // ✅ إضافة الـ ID
+                          ),
+                        );
+                  }
+                  Navigator.of(context).pop();
+                }
+              },
+              child: const Text('حفظ التغييرات'),
+            ),
+          ],
+        );
+      },
+    );
+}
+
+Widget _buildVisitList(List<Map<String, dynamic>> visits, String status) {
+    if (visits.isEmpty) {
+      return Center(child: Text('لا توجد زيارات ${status} حاليًا.'));
+    }
+    return ListView.builder(
+      itemCount: visits.length,
+      itemBuilder: (context, index) {
+        final visit = visits[index];
+        final visitDate = DateTime.parse(visit['date']);
+        return Dismissible(
+          key: Key(visit['id']),
+          direction: DismissDirection.endToStart,
+          onDismissed: (direction) {
+            final homeState = context.read<HomeBloc>().state;
+            if (homeState is HomeLoaded) {
+              context.read<VisitBloc>().add(
+                    DeleteVisit(
+                      id: visit['id'],
+                      status: visit['status'],
+                      institutionId: homeState.institutionId, // ✅ إضافة الـ ID
+                    ),
+                  );
+            }
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('تم حذف زيارة ${visit['name']}')),
+            );
+          },
+          background: Container(
+            color: Colors.red,
+            alignment: Alignment.centerRight,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: const Icon(Icons.delete, color: Colors.white),
+          ),
+          child: ListTile(
+            title: Text(visit['name']),
+            subtitle: Text('الموقع: ${visit['location']}'),
+            trailing: Text(
+              '${visitDate.year}-${visitDate.month.toString().padLeft(2, '0')}-${visitDate.day.toString().padLeft(2, '0')} '
+              '${visitDate.hour.toString().padLeft(2, '0')}:${visitDate.minute.toString().padLeft(2, '0')}',
+            ),
+            onTap: () => _showUpdateDialog(visit),
+          ),
+        );
+      },
+    );
+}
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocListener<VisitBloc, VisitState>(
+      listener: (context, state) {
+        if (state is VisitLoaded) {
+          context.read<HomeBloc>().add(LoadHomeData());
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('الزيارات الميدانية'),
+          backgroundColor: AppColors.primaryColor,
+          elevation: 0,
+          bottom: TabBar(
+            controller: _tabController,
+            tabs: const [
+              Tab(text: 'الزيارات المجدولة'),
+              Tab(text: 'الزيارات المكتملة'),
+            ],
+          ),
+        ),
+        drawer: _buildDrawer(),
+        body: BlocBuilder<VisitBloc, VisitState>(
+          builder: (context, state) {
+            if (state is VisitLoading) {
+              return const Center(child: CircularProgressIndicator());
+            } else if (state is VisitLoaded) {
+              return TabBarView(
+                controller: _tabController,
+                children: [
+                  _buildVisitList(state.scheduledVisits, 'مجدولة'),
+                  _buildVisitList(state.completedVisits, 'مكتملة'),
+                ],
+              );
+            } else if (state is VisitError) {
+              return Center(child: Text('Error: ${state.message}'));
+            }
+            return const Center(child: Text('ابدأ بإضافة زيارات جديدة'));
+          },
+        ),
+        floatingActionButton: FloatingActionButton(
+          onPressed: () {
+            _titleController.clear();
+            _addressController.clear();
+            _selectedDate = DateTime.now();
+            _selectedTime = TimeOfDay.now();
+            showDialog(
+              context: context,
+              builder: (context) {
+                return AlertDialog(
+                  title: const Text('إضافة زيارة جديدة'),
+                  content: SingleChildScrollView(
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          TextFormField(
+                            controller: _titleController,
+                            decoration: const InputDecoration(labelText: 'عنوان الزيارة'),
+                            validator: (value) => value!.isEmpty ? 'لا يمكن أن يكون العنوان فارغًا' : null,
+                          ),
+                          TextFormField(
+                            controller: _addressController,
+                            decoration: const InputDecoration(labelText: 'موقع الزيارة'),
+                            validator: (value) => value!.isEmpty ? 'لا يمكن أن يكون الموقع فارغًا' : null,
+                          ),
+                          ListTile(
+                            title: Text("التاريخ: ${_selectedDate.toLocal().toString().split(' ')[0]}"),
+                            trailing: const Icon(Icons.keyboard_arrow_down),
+                            onTap: _selectDate,
+                          ),
+                          ListTile(
+                            title: Text("الوقت: ${_selectedTime.format(context)}"),
+                            trailing: const Icon(Icons.keyboard_arrow_down),
+                            onTap: _selectTime,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('إلغاء'),
+                    ),
+                    ElevatedButton(
+                      onPressed: _saveVisit,
+                      child: const Text('حفظ'),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+          backgroundColor: AppColors.primaryColor,
+          child: const Icon(Icons.add),
+        ),
       ),
     );
   }
+
+  Widget _buildDrawer() {
+    return BlocBuilder<HomeBloc, HomeState>(
+      builder: (context, state) {
+        if (state is HomeLoaded) {
+          return AppDrawer(
+            userName: state.userName,
+            userRole: state.userRole,
+            profileImageUrl: state.profileImageUrl,
+            orphanCount: state.totalOrphans,
+            taskCount: state.totalTasks,
+            visitCount: state.totalVisits,
+            onLogout: () {
+              context.read<AuthBloc>().add(LogoutButtonPressed());
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+                (route) => false,
+              );
+            },
+          );
+        }
+        // حالة التحميل أو الخطأ
+        return AppDrawer(
+          userName: 'Loading...',
+          userRole: '...',
+          profileImageUrl: '',
+          orphanCount: 0,
+          taskCount: 0,
+          visitCount: 0,
+          onLogout: () {},
+        );
+      },
+    );
+  }
+
+
 }

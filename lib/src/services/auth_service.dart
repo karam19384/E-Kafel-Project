@@ -1,4 +1,5 @@
 // lib/src/services/auth_service.dart
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:e_kafel/src/services/firestore_service.dart';
@@ -7,6 +8,8 @@ class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirestoreService _firestoreService = FirestoreService();
   final GoogleSignIn _googleSignIn = GoogleSignIn();
+    final FirebaseFirestore _firestore = FirebaseFirestore.instance;  // ✅ أضف هذا
+
 
   // تسجيل الدخول بالبريد/كلمة مرور أو المعرف الفريد
   Future<String?> signIn({
@@ -34,7 +37,27 @@ class AuthService {
       return e.message;
     }
   }
+    // ✅ استرجاع userRole من Firestore
+  Future<String?> getUserRole(String uid) async {
+    try {
+      // البحث أولاً في kafala_head
+      final kafalaDoc = await _firestore.collection('kafala_head').doc(uid).get();
+      if (kafalaDoc.exists) {
+        return kafalaDoc.data()?['userRole'] ?? 'kafala_head';
+      }
 
+      // البحث ثانياً في supervisor
+      final supervisorDoc = await _firestore.collection('supervisor').doc(uid).get();
+      if (supervisorDoc.exists) {
+        return supervisorDoc.data()?['userRole'] ?? 'supervisor';
+      }
+
+      return null;
+    } catch (e) {
+      print("Error fetching userRole: $e");
+      return null;
+    }
+  }
   // تسجيل الخروج
   Future<void> signOut() async {
     await _auth.signOut();

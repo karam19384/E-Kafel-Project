@@ -25,7 +25,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       try {
         final userData = await _firestoreService.getUserData(user.uid);
         if (userData != null) {
-          final userRole = userData['role'] as String? ?? 'unknown';
+          final userRole = userData['userRole'] as String? ?? 'غير معروف';
           final institutionId = userData['institutionId'] as String?;
 
           if (institutionId == null) {

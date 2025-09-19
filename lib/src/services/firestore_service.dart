@@ -574,4 +574,57 @@ Future<String?> addOrphan({
       return false;
     }
   }
+
+
+  // ===================== VISITS =====================
+
+  // 🔹 إضافة زيارة جديدة
+  Future<void> addVisit(Map<String, dynamic> visitData) async {
+    await _firestore.collection('visits').add(visitData);
+  }
+
+  // 🔹 تحميل كل الزيارات
+  Future<List<Map<String, dynamic>>> getVisits() async {
+    final snapshot = await _firestore.collection('visits').get();
+    return snapshot.docs.map((doc) {
+      return {
+        'id': doc.id,
+        ...doc.data(),
+      };
+    }).toList();
+  }
+
+ Future<List<Map<String, dynamic>>> getVisitsByStatus(
+      String institutionId, String status) async {
+    try {
+      final snapshot = await _firestore
+          .collection('visits')
+          .where('institutionId', isEqualTo: institutionId)
+          .where('status', isEqualTo: status)
+          .orderBy('date', descending: true)
+          .get();
+      return snapshot.docs.map((doc) {
+        return {
+          'id': doc.id,
+          ...doc.data(),
+        };
+      }).toList();
+    } catch (e) {
+      print('Error getting visits by status: $e');
+      return [];
+    }
+  }
+
+
+  // 🔹 تحديث زيارة
+  Future<void> updateVisit(String id, Map<String, dynamic> updates) async {
+    await _firestore.collection('visits').doc(id).update(updates);
+  }
+
+  // 🔹 حذف زيارة
+  Future<void> deleteVisit(String id) async {
+    await _firestore.collection('visits').doc(id).delete();
+  }
+
+
 }
