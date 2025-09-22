@@ -70,6 +70,6 @@ class SignUpButtonPressed extends AuthEvent {
 class SignInWithGoogleButtonPressed extends AuthEvent {}
 
 
-class GoogleSignInButtonPressed extends AuthEvent {}   // ✅ مضافة
+class GoogleSignInButtonPressed extends AuthEvent {}  
 
 class SignOutButtonPressed extends AuthEvent {}   

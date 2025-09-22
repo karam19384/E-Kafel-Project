@@ -8,7 +8,12 @@ abstract class OrphansEvent extends Equatable {
 }
 
 // جلب قائمة الأيتام
-class LoadOrphans extends OrphansEvent {}
+class LoadOrphans extends OrphansEvent {
+  final String institutionId; 
+  const LoadOrphans({required this.institutionId}); 
+  @override
+  List<Object?> get props => [institutionId]; 
+}
 
 // إضافة يتيم جديد
 class AddOrphan extends OrphansEvent {
@@ -16,7 +21,6 @@ class AddOrphan extends OrphansEvent {
   final File? idCardFile;
   final File? deathCertificateFile;
   final File? orphanPhotoFile;
-  // تم إضافة final هنا لتكون الخصائص قابلة للوصول
   final Uint8List? idCardBytes;
   final Uint8List? deathCertificateBytes;
   final Uint8List? orphanPhotoBytes;
@@ -37,7 +41,6 @@ class AddOrphan extends OrphansEvent {
     idCardFile,
     deathCertificateFile,
     orphanPhotoFile,
-    // تم إضافة متغيرات bytes هنا
     idCardBytes,
     deathCertificateBytes,
     orphanPhotoBytes,
@@ -47,29 +50,22 @@ class AddOrphan extends OrphansEvent {
 // تحديث بيانات يتيم
 class UpdateOrphan extends OrphansEvent {
   final String orphanId;
+    final String institutionId;
+
   final Map<String, dynamic> updatedData;
 
-  const UpdateOrphan(this.orphanId, this.updatedData);
+  const UpdateOrphan(this.orphanId, this.updatedData , this.institutionId); 
 
   @override
   List<Object?> get props => [orphanId, updatedData];
 }
 
-/*
-// حذف يتيم
-class DeleteOrphan extends OrphansEvent {
-  final String orphanId;
-
-  const DeleteOrphan(this.orphanId);
-
-  @override
-  List<Object?> get props => [orphanId];
-}
-*/
+// أرشفة يتيم
 class ArchiveOrphan extends OrphansEvent {
   final String orphanId;
+  final String institutionId;
 
-  const ArchiveOrphan(this.orphanId);
+  const ArchiveOrphan(this.orphanId , this.institutionId); 
 
   @override
   List<Object> get props => [orphanId];

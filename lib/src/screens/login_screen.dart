@@ -13,7 +13,6 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  // تم تغيير اسم المتحكم إلى _loginIdentifierController
   final _loginIdentifierController = TextEditingController();
   final _passwordController = TextEditingController();
 
@@ -50,10 +49,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Form(
                   child: Column(
                     children: [
-                      // حقل إدخال البريد الإلكتروني أو المعرف الفريد
                       _buildInputField(
                         controller: _loginIdentifierController,
-                        // تم تغيير التسمية لتعكس الدعم الجديد
                         labelText: 'البريد الإلكتروني أو المعرف الفريد',
                         keyboardType: TextInputType.emailAddress,
                       ),

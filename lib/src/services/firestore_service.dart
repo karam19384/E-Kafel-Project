@@ -176,7 +176,7 @@ class FirestoreService {
         isEqualTo: true,
       );
       final supervisorsCountQuery = _firestore
-          .collection('users')
+          .collection('supervisors')
           .where('institutionId', isEqualTo: institutionId)
           .where('role', isEqualTo: 'supervisor');
       final completedTasksQuery = _firestore
@@ -187,11 +187,11 @@ class FirestoreService {
           .collection('tasks')
           .where('institutionId', isEqualTo: institutionId);
       final totalVisitsQuery = _firestore
-          .collection('field_visits')
+          .collection('visits')
           .where('institutionId', isEqualTo: institutionId);
       final completedFieldVisitsQuery = totalVisitsQuery.where(
         'status',
-        isEqualTo: 'completed',
+        isEqualTo: 'مكتملة',
       );
 
       // Fetch counts
@@ -326,6 +326,25 @@ class FirestoreService {
   }
 
   // ========== Orphans ==========
+  
+Future<List<Map<String, dynamic>>> getOrphansByInstitutionId(
+    String institutionId) async {
+  try {
+    final snapshot = await _firestore
+        .collection('orphans')
+        .where('institutionId', isEqualTo: institutionId) 
+        .where('isArchived', isEqualTo: false)
+        .get();
+    
+    return snapshot.docs.map((doc) {
+      return {'id': doc.id, ...doc.data()};
+    }).toList();
+  } catch (e) {
+    print('Error getting orphans by institution ID: $e');
+    return [];
+  }
+}
+  
   Query getOrphansQuery({
     required String institutionId,
     String? searchTerm,
@@ -575,7 +594,6 @@ Future<String?> addOrphan({
     }
   }
 
-
   // ===================== VISITS =====================
 
   // 🔹 إضافة زيارة جديدة
@@ -584,37 +602,18 @@ Future<String?> addOrphan({
   }
 
   // 🔹 تحميل كل الزيارات
-  Future<List<Map<String, dynamic>>> getVisits() async {
-    final snapshot = await _firestore.collection('visits').get();
-    return snapshot.docs.map((doc) {
-      return {
-        'id': doc.id,
-        ...doc.data(),
-      };
-    }).toList();
-  }
-
- Future<List<Map<String, dynamic>>> getVisitsByStatus(
-      String institutionId, String status) async {
-    try {
-      final snapshot = await _firestore
-          .collection('visits')
-          .where('institutionId', isEqualTo: institutionId)
-          .where('status', isEqualTo: status)
-          .orderBy('date', descending: true)
-          .get();
-      return snapshot.docs.map((doc) {
-        return {
-          'id': doc.id,
-          ...doc.data(),
-        };
-      }).toList();
-    } catch (e) {
-      print('Error getting visits by status: $e');
-      return [];
-    }
-  }
-
+Future<List<Map<String, dynamic>>> getAllVisits(String institutionId, String status) async {
+  final snapshot = await _firestore
+      .collection('visits')
+      .where('institutionId', isEqualTo: institutionId)
+      .where('status', isEqualTo: status)
+      .get();
+  return snapshot.docs.map((doc) {
+    final data = doc.data();
+    data['id'] = doc.id;
+    return data;
+  }).toList();
+}
 
   // 🔹 تحديث زيارة
   Future<void> updateVisit(String id, Map<String, dynamic> updates) async {

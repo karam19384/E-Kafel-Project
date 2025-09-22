@@ -12,7 +12,6 @@ import 'package:e_kafel/src/services/firestore_service.dart';
 import 'firebase_options.dart';
 import 'src/blocs/orphans/orphans_bloc.dart';
 import 'src/blocs/visit/visit_bloc.dart';
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);

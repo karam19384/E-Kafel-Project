@@ -3,13 +3,15 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:e_kafel/src/blocs/home/home_bloc.dart';
-import 'package:e_kafel/src/screens/edit_orphan_details_screen.dart'; // تأكد من المسار الصحيح
+import 'package:e_kafel/src/screens/edit_orphan_details_screen.dart';
 import 'package:e_kafel/src/widgets/app_drawer.dart';
 import 'package:e_kafel/src/blocs/auth/auth_bloc.dart';
+import '../blocs/orphans/orphans_bloc.dart';
 import 'login_screen.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class OrphanDetailsScreen extends StatefulWidget {
-  final String orphanId;
+  final String orphanId; // docId
 
   const OrphanDetailsScreen({super.key, required this.orphanId});
 
@@ -19,7 +21,7 @@ class OrphanDetailsScreen extends StatefulWidget {
 
 class _OrphanDetailsScreenState extends State<OrphanDetailsScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  Map<String, dynamic>? _orphanData;
+  Map<String, dynamic>? orphanData;
   bool _isLoading = true;
   String? _errorMessage;
 
@@ -31,491 +33,136 @@ class _OrphanDetailsScreenState extends State<OrphanDetailsScreen> {
 
   Future<void> _fetchOrphanDetails() async {
     try {
-      final docSnapshot = await _firestore
-          .collection('orphans')
-          .doc(widget.orphanId)
-          .get();
+      final docSnapshot =
+          await _firestore.collection('orphans').doc(widget.orphanId).get();
 
       if (docSnapshot.exists) {
         setState(() {
-          _orphanData = docSnapshot.data() as Map<String, dynamic>;
+          orphanData = docSnapshot.data();
+          orphanData!['id'] = docSnapshot.id; // نخزن docId مع البيانات
           _isLoading = false;
         });
       } else {
         setState(() {
+          _errorMessage = 'بيانات اليتيم غير موجودة.';
           _isLoading = false;
-          _errorMessage = 'Orphan not found.';
         });
       }
     } catch (e) {
       setState(() {
+        _errorMessage = 'فشل في تحميل البيانات: $e';
         _isLoading = false;
-        _errorMessage = 'Error loading orphan details: $e';
       });
-      print('Error fetching orphan details: $e');
     }
   }
 
-  // دالة لتأكيد وحذف اليتيم
-  Future<void> _confirmAndDeleteOrphan() async {
-    final bool? confirm = await showDialog<bool>(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15),
-          ),
-          title: const Text(
-            'Confirm Deletion',
-            style: TextStyle(color: Color(0xFF4C7F7F)),
-          ),
-          content: const Text(
-            'Are you sure you want to delete this orphan? This action cannot be undone.',
-            style: TextStyle(color: Colors.black87),
-          ),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () =>
-                  Navigator.of(context).pop(false), // لا تؤكد الحذف
-              child: const Text(
-                'Cancel',
-                style: TextStyle(
-                  color: Color(0xFF6DAF97),
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(true), // تؤكد الحذف
-              child: const Text(
-                'Delete',
-                style: TextStyle(
-                  color: Colors.red,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ],
-        );
-      },
+  void _sendSMS() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('سيتم إرسال رسالة نصية قريباً.')),
     );
-
-    if (confirm == true) {
-      setState(() {
-        _isLoading = true; // عرض مؤشر تحميل أثناء الحذف
-      });
-      try {
-        await _firestore.collection('orphans').doc(widget.orphanId).delete();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Orphan deleted successfully!')),
-          );
-          Navigator.of(
-            context,
-          ).pop(true); // العودة إلى الشاشة السابقة وإعلامها بالحذف
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to delete orphan: $e')),
-          );
-        }
-        print('Error deleting orphan: $e');
-      } finally {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
   }
 
-  // دالة لعرض نافذة إضافة الكفالة المنبثقة
-  Future<void> _showAddSponsorshipDialog() async {
-    String? sponsorshipType;
-    String? sponsorshipAmount;
-    final GlobalKey<FormState> _sponsorshipFormKey = GlobalKey<FormState>();
-
-    await showDialog(
+  void _archiveOrphan() async {
+    final bool? shouldArchive = await showDialog<bool>(
       context: context,
-      builder: (BuildContext dialogContext) {
-        // استخدام dialogContext هنا
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15),
+      builder: (context) => AlertDialog(
+        title: const Text('تأكيد الأرشفة'),
+        content: const Text('هل أنت متأكد من أرشفة هذا اليتيم؟'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('إلغاء'),
           ),
-          title: const Text(
-            'Add Sponsorship',
-            style: TextStyle(color: Color(0xFF4C7F7F)),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('أرشفة'),
           ),
-          content: Form(
-            key: _sponsorshipFormKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                DropdownButtonFormField<String>(
-                  decoration: InputDecoration(
-                    labelText: 'Sponsorship Type',
-                    prefixIcon: const Icon(
-                      Icons.category,
-                      color: Color(0xFF4C7F7F),
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: Color(0xFF6DAF97)),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(
-                        color: Color(0xFF4C7F7F),
-                        width: 2,
-                      ),
-                    ),
-                  ),
-                  value: sponsorshipType,
-                  hint: const Text('Select Type'),
-                  items: <String>['Monthly', 'One-time', 'Education', 'Health']
-                      .map<DropdownMenuItem<String>>((String value) {
-                        return DropdownMenuItem<String>(
-                          value: value,
-                          child: Text(value),
-                        );
-                      })
-                      .toList(),
-                  onChanged: (String? newValue) {
-                    sponsorshipType = newValue;
-                  },
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please select a sponsorship type';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 15),
-                TextFormField(
-                  decoration: InputDecoration(
-                    labelText: 'Amount (\$)',
-                    hintText: 'Enter amount',
-                    prefixIcon: const Icon(
-                      Icons.attach_money,
-                      color: Color(0xFF4C7F7F),
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: Color(0xFF6DAF97)),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(
-                        color: Color(0xFF4C7F7F),
-                        width: 2,
-                      ),
-                    ),
-                  ),
-                  keyboardType: TextInputType.number,
-                  onChanged: (value) {
-                    sponsorshipAmount = value;
-                  },
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter an amount';
-                    }
-                    if (double.tryParse(value) == null) {
-                      return 'Please enter a valid number';
-                    }
-                    return null;
-                  },
-                ),
-              ],
-            ),
-          ),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text(
-                'Cancel',
-                style: TextStyle(color: Color(0xFF6DAF97)),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (_sponsorshipFormKey.currentState!.validate()) {
-                  // هنا يمكنك حفظ بيانات الكفالة الجديدة إلى Firestore
-                  // مثلاً، في مجموعة فرعية داخل مستند اليتيم، أو في مجموعة منفصلة
-                  try {
-                    await _firestore
-                        .collection('orphans')
-                        .doc(widget.orphanId)
-                        .collection('sponsorships')
-                        .add({
-                          'type': sponsorshipType,
-                          'amount': double.parse(sponsorshipAmount!),
-                          'dateAdded': Timestamp.now(),
-                          // يمكنك إضافة المزيد من الحقول هنا مثل اسم الكفيل إن وجد
-                        });
-                    // تحديث حقل Total Support لليتيم
-                    final double currentTotalSupport =
-                        _orphanData?['totalSupport'] ?? 0.0;
-                    await _firestore
-                        .collection('orphans')
-                        .doc(widget.orphanId)
-                        .update({
-                          'totalSupport':
-                              currentTotalSupport +
-                              double.parse(sponsorshipAmount!),
-                          'latestSupportDate':
-                              Timestamp.now(), // تحديث تاريخ آخر دعم
-                        });
-
-                    if (mounted) {
-                      // تحقق من mounted قبل استخدام السياق
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Sponsorship added successfully!'),
-                        ),
-                      );
-                      Navigator.of(
-                        dialogContext,
-                      ).pop(); // إغلاق النافذة المنبثقة
-                      _fetchOrphanDetails(); // إعادة جلب التفاصيل لتحديث العرض
-                    }
-                  } catch (e) {
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Failed to add sponsorship: $e'),
-                        ),
-                      );
-                    }
-                    print('Error adding sponsorship: $e');
-                  }
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF6DAF97),
-              ),
-              child: const Text('Add', style: TextStyle(color: Colors.white)),
-            ),
-          ],
-        );
-      },
+        ],
+      ),
     );
+
+    if (shouldArchive == true) {
+      context.read<OrphansBloc>().add(
+            ArchiveOrphan(
+              widget.orphanId,
+              orphanData!['institutionId'] ?? '',
+            ),
+          );
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تم أرشفة اليتيم بنجاح!')),
+      );
+
+      Navigator.of(context).pop();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    String orphanFullName =
-        _orphanData?['name'] ?? 'N/A'; // استخدم 'name' من Firestore
-    String orphanNo = _orphanData?['orphanNo'] ?? 'N/A';
-    String sponsorshipStatus = _orphanData?['sponsorshipStatus'] ?? 'N/A';
-    String totalSupport = (_orphanData?['totalSupport'] ?? 0.0).toStringAsFixed(
-      2,
-    );
-    String lastSupportDate = 'N/A';
-
-    if (_orphanData?['latestSupportDate'] is Timestamp) {
-      lastSupportDate = DateFormat(
-        'dd/MM/yyyy',
-      ).format((_orphanData!['latestSupportDate'] as Timestamp).toDate());
-    } else if (_orphanData?['latestSupportDate'] is String) {
-      try {
-        lastSupportDate = DateFormat(
-          'dd/MM/yyyy',
-        ).format(DateTime.parse(_orphanData!['latestSupportDate']));
-      } catch (e) {
-        print('Error parsing lastSupportDate: $e');
-      }
-    }
-
     return Scaffold(
-      backgroundColor: const Color(0xFFF0E8EB),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF6DAF97),
-        elevation: 0,
-        title: const Text(
-          'Orphan Details',
-          style: TextStyle(color: Colors.white),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () {
-            Navigator.pop(context);
-          },
-        ),
+        title: const Text('تفاصيل اليتيم'),
+        centerTitle: true,
+        backgroundColor: const Color(0xFF4C7F7F),
       ),
-      drawer: BlocBuilder<HomeBloc, HomeState>(
-        builder: (context, state) {
-          if (state is HomeLoaded) {
-            return AppDrawer(
-              userName: state.userName,
-              userRole: state.userRole,
-              profileImageUrl: state.profileImageUrl,
-              orphanCount: state.orphanSponsored,
-              taskCount:
-                  state.completedTasksPercentage, // عدلها حسب المتغير المناسب
-              visitCount:
-                  state.completedFieldVisits, // عدلها حسب المتغير المناسب
-              onLogout: () {
-                context.read<AuthBloc>().add(LogoutButtonPressed());
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (context) => const LoginScreen()),
-                  (Route<dynamic> route) => false,
-                );
-              },
-            );
-          }
-          return AppDrawer(
-            userName: '',
-            userRole: '',
-            orphanCount: 0,
-            taskCount: 0,
-            visitCount: 0,
-            onLogout: () {
-              Navigator.pop(context);
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const LoginScreen()),
-              );
-            },
-          );
-        },
-      ),
-
+      drawer: _buildDrawer(),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _errorMessage != null
-          ? Center(child: Text(_errorMessage!))
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(20.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: CircleAvatar(
-                      radius: 70,
-                      backgroundColor: const Color(0xFF6DAF97),
-                      backgroundImage:
-                          _orphanData?['profileImageUrl'] != null &&
-                              _orphanData!['profileImageUrl'].isNotEmpty
-                          ? NetworkImage(_orphanData!['profileImageUrl'])
-                          : null,
-                      child:
-                          _orphanData?['profileImageUrl'] == null ||
-                              _orphanData!['profileImageUrl'].isEmpty
-                          ? const Icon(
-                              Icons.person,
-                              color: Colors.white,
-                              size: 80,
-                            )
-                          : null,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+              ? Center(child: Text(_errorMessage!))
+              : SingleChildScrollView(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      _buildActionButton(
-                        icon: Icons.delete,
-                        label: 'Remove',
-                        color: const Color(
-                          0xFFE0BBE4,
-                        ), // لون مشابه للوردي في الصورة
-                        onPressed: _confirmAndDeleteOrphan,
-                      ),
-                      _buildActionButton(
-                        icon: Icons.edit,
-                        label: 'Edit Data',
-                        color: const Color(
-                          0xFFC8A2C8,
-                        ), // لون مشابه للأخضر في الصورة
-                        onPressed: () async {
-                          final result = await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => EditOrphanDetailsScreen(
-                                orphanId: widget.orphanId,
-                              ),
-                            ),
-                          );
-                          if (result == true) {
-                            _fetchOrphanDetails(); // تحديث البيانات بعد العودة من شاشة التعديل
-                          }
-                        },
-                      ),
-                      _buildActionButton(
-                        icon: Icons.add,
-                        label: 'Add Sponsorship',
-                        color: const Color(
-                          0xFFAFD8D2,
-                        ), // لون مشابه للأزرق في الصورة
-                        onPressed: _showAddSponsorshipDialog,
-                      ),
+                      _buildActionButtons(),
+                      const SizedBox(height: 20),
+                      _buildDetailsCard(),
+                      const SizedBox(height: 20),
+                      _buildFilesCard(),
                     ],
                   ),
-                  const SizedBox(height: 30),
-
-                  _buildDetailRow(
-                    label: 'Orphan Full Name',
-                    value: orphanFullName,
-                  ),
-                  _buildDetailRow(label: 'Orphan No.', value: orphanNo),
-                  _buildDetailRow(
-                    label: 'ID Number',
-                    value: _orphanData?['idNumber'] ?? 'N/A',
-                  ),
-                  _buildDetailRow(
-                    label: 'Phone',
-                    value: _orphanData?['phone'] ?? 'N/A',
-                  ),
-                  _buildDetailRow(
-                    label: 'Sponsorship Status',
-                    value: sponsorshipStatus,
-                  ),
-                  _buildDetailRow(
-                    label: 'Last Support',
-                    value: lastSupportDate,
-                  ),
-                  _buildDetailRow(
-                    label: 'Total Support This Year',
-                    value: '\$$totalSupport',
-                  ),
-                  _buildDetailRow(
-                    label: 'Total Family Members',
-                    value: _orphanData?['familyMembers']?.toString() ?? 'N/A',
-                  ),
-                  _buildDetailRow(
-                    label: 'Age',
-                    value: _orphanData?['age']?.toString() ?? 'N/A',
-                  ),
-                  _buildDetailRow(
-                    label: 'Governorate',
-                    value: _orphanData?['governorate'] ?? 'N/A',
-                  ),
-                  _buildDetailRow(
-                    label: 'Relationship to deceased',
-                    value: _orphanData?['relationshipToDeceased'] ?? 'N/A',
-                  ),
-                  _buildDetailRow(
-                    label: 'Gender',
-                    value: _orphanData?['gender'] ?? 'N/A',
-                  ),
-                  _buildDetailRow(
-                    label: 'Cause of Death',
-                    value: _orphanData?['causeOfDeath'] ?? 'N/A',
-                  ),
-                ],
-              ),
-            ),
+                ),
     );
   }
 
-  // Helper widget for action buttons
+  Widget _buildActionButtons() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        _buildActionButton(
+          icon: Icons.edit,
+          label: 'تعديل',
+          color: Colors.blue,
+          onPressed: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => EditOrphanDetailsScreen(
+                  orphanId: widget.orphanId,
+                  orphanData: orphanData!,
+                  institutionId: orphanData!['institutionId'] ?? '',
+                ),
+              ),
+            );
+          },
+        ),
+        _buildActionButton(
+          icon: Icons.sms,
+          label: 'رسالة',
+          color: const Color(0xFFE0BBE4),
+          onPressed: _sendSMS,
+        ),
+        _buildActionButton(
+          icon: Icons.archive,
+          label: 'أرشفة',
+          color: Colors.red,
+          onPressed: _archiveOrphan,
+        ),
+      ],
+    );
+  }
+
   Widget _buildActionButton({
     required IconData icon,
     required String label,
@@ -547,7 +194,83 @@ class _OrphanDetailsScreenState extends State<OrphanDetailsScreen> {
     );
   }
 
-  // Helper widget for displaying detail rows
+  Widget _buildDetailsCard() {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'بيانات اليتيم',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF4C7F7F),
+              ),
+            ),
+            const Divider(),
+            _buildDetailRow(label: 'رقم اليتيم', value: _safeString(orphanData!['orphanNo'])),
+            _buildDetailRow(label: 'الاسم الكامل', value: _safeString(orphanData!['name'])),
+            _buildDetailRow(label: 'الرقم الوطني', value: _safeString(orphanData!['orphanIdNumber'])),
+            _buildDetailRow(label: 'تاريخ الميلاد', value: _formatDate(orphanData!['dateOfBirth'])),
+            _buildDetailRow(label: 'الجنس', value: _safeString(orphanData!['gender'])),
+            _buildDetailRow(label: 'اسم الأم', value: _safeString(orphanData!['motherName'])),
+            _buildDetailRow(label: 'الرقم الوطني للأم', value: _safeString(orphanData!['motherIdNumber'])),
+            _buildDetailRow(label: 'اسم المعيل', value: _safeString(orphanData!['breadwinnerName'])),
+            _buildDetailRow(label: 'الرقم الوطني للمعيل', value: _safeString(orphanData!['breadwinnerIdNumber'])),
+            _buildDetailRow(label: 'حالة المعيل الاجتماعية', value: _safeString(orphanData!['breadwinnerMaritalStatus'])),
+            _buildDetailRow(label: 'صلة القرابة بالمعيل', value: _safeString(orphanData!['breadwinnerKinship'])),
+            _buildDetailRow(label: 'اسم المتوفى', value: _safeString(orphanData!['deceasedName'])),
+            _buildDetailRow(label: 'الرقم الوطني للمتوفى', value: _safeString(orphanData!['deceasedIdNumber'])),
+            _buildDetailRow(label: 'تاريخ الوفاة', value: _formatDate(orphanData!['dateOfDeath'])),
+            _buildDetailRow(label: 'سبب الوفاة', value: _safeString(orphanData!['causeOfDeath'])),
+            _buildDetailRow(label: 'المحافظة', value: _safeString(orphanData!['governorate'])),
+            _buildDetailRow(label: 'المدينة', value: _safeString(orphanData!['city'])),
+            _buildDetailRow(label: 'الحي', value: _safeString(orphanData!['neighborhood'])),
+            _buildDetailRow(label: 'رقم الهاتف', value: _safeString(orphanData!['mobileNumber'])),
+            _buildDetailRow(label: 'رقم الأرضي', value: _safeString(orphanData!['phoneNumber'])),
+            _buildDetailRow(label: 'عدد الذكور', value: _safeString(orphanData!['numberOfMales'], defaultValue: '0')),
+            _buildDetailRow(label: 'عدد الإناث', value: _safeString(orphanData!['numberOfFemales'], defaultValue: '0')),
+            _buildDetailRow(label: 'إجمالي أفراد العائلة', value: _safeString(orphanData!['totalFamilyMembers'], defaultValue: '0')),
+            _buildDetailRow(label: 'اسم المدرسة', value: _safeString(orphanData!['schoolName'])),
+            _buildDetailRow(label: 'الصف', value: _safeString(orphanData!['grade'])),
+            _buildDetailRow(label: 'المستوى التعليمي', value: _safeString(orphanData!['educationLevel'])),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilesCard() {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'الملفات المرفقة',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF4C7F7F),
+              ),
+            ),
+            const Divider(),
+            _buildFileRow(label: 'صورة الهوية', url: orphanData!['idCardUrl']),
+            _buildFileRow(label: 'شهادة الوفاة', url: orphanData!['deathCertificateUrl']),
+            _buildFileRow(label: 'صورة شخصية', url: orphanData!['orphanPhotoUrl']),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildDetailRow({required String label, required String value}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -570,11 +293,101 @@ class _OrphanDetailsScreenState extends State<OrphanDetailsScreen> {
             flex: 3,
             child: Text(
               value,
-              style: const TextStyle(fontSize: 16, color: Colors.black87),
+              style: const TextStyle(fontSize: 16, color: Color(0xFF4C7F7F)),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildFileRow({required String label, required String? url}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 2,
+            child: Text(
+              '$label:',
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                color: Color(0xFF4C7F7F),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            flex: 3,
+            child: url != null && url.isNotEmpty
+                ? InkWell(
+                    onTap: () async {
+                      final uri = Uri.parse(url);
+                      if (await canLaunchUrl(uri)) {
+                        await launchUrl(uri);
+                      }
+                    },
+                    child: const Text(
+                      'عرض الملف',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.blue,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  )
+                : const Text(
+                    'لا يوجد',
+                    style: TextStyle(fontSize: 16, color: Color(0xFF4C7F7F)),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDate(dynamic date) {
+    if (date is Timestamp) return DateFormat('dd/MM/yyyy').format(date.toDate());
+    if (date is DateTime) return DateFormat('dd/MM/yyyy').format(date);
+    return 'غير متوفر';
+  }
+
+  String _safeString(dynamic value, {String defaultValue = 'غير متوفر'}) {
+    if (value == null) return defaultValue;
+    return value.toString();
+  }
+
+  Widget _buildDrawer() {
+    return BlocBuilder<HomeBloc, HomeState>(
+      builder: (context, state) {
+        if (state is HomeLoaded) {
+          return AppDrawer(
+            userName: state.userName,
+            userRole: state.userRole,
+            profileImageUrl: state.profileImageUrl,
+            orphanCount: state.totalOrphans,
+            taskCount: state.totalTasks,
+            visitCount: state.totalVisits,
+            onLogout: () {
+              context.read<AuthBloc>().add(LogoutButtonPressed());
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+                (route) => false,
+              );
+            },
+          );
+        }
+        return AppDrawer(
+          userName: 'Loading...',
+          userRole: '...',
+          profileImageUrl: '',
+          orphanCount: 0,
+          taskCount: 0,
+          visitCount: 0,
+          onLogout: () {},
+        );
+      },
     );
   }
 }

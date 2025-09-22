@@ -8,7 +8,7 @@ class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirestoreService _firestoreService = FirestoreService();
   final GoogleSignIn _googleSignIn = GoogleSignIn();
-    final FirebaseFirestore _firestore = FirebaseFirestore.instance;  // ✅ أضف هذا
+    final FirebaseFirestore _firestore = FirebaseFirestore.instance; 
 
 
   // تسجيل الدخول بالبريد/كلمة مرور أو المعرف الفريد
@@ -37,7 +37,6 @@ class AuthService {
       return e.message;
     }
   }
-    // ✅ استرجاع userRole من Firestore
   Future<String?> getUserRole(String uid) async {
     try {
       // البحث أولاً في kafala_head

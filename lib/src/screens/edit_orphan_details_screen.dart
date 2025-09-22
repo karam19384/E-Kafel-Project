@@ -1,11 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:intl/intl.dart'; // لإدارة تنسيق التاريخ
+import 'package:intl/intl.dart';
+import '../blocs/orphans/orphans_bloc.dart';
+import '../themes/app_colors.dart';
 
 class EditOrphanDetailsScreen extends StatefulWidget {
   final String orphanId;
+  final String institutionId;
 
-  const EditOrphanDetailsScreen({super.key, required this.orphanId});
+  const EditOrphanDetailsScreen({
+    super.key,
+    required this.orphanId,
+    required this.institutionId, required Map<String, dynamic> orphanData,
+  });
 
   @override
   State<EditOrphanDetailsScreen> createState() =>
@@ -16,27 +24,45 @@ class _EditOrphanDetailsScreenState extends State<EditOrphanDetailsScreen> {
   final _formKey = GlobalKey<FormState>();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // Controllers for text input fields
+  // Controllers
   final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _phoneController = TextEditingController();
-  final TextEditingController _idNumberController = TextEditingController();
-  final TextEditingController _orphanNoController = TextEditingController();
-  final TextEditingController _profileImageUrlController =
+  final TextEditingController _birthdateController = TextEditingController();
+  final TextEditingController _genderController = TextEditingController();
+  final TextEditingController _orphanIdNumberController =
       TextEditingController();
-  final TextEditingController _totalSupportController =
-      TextEditingController(); // For range slider display or single input
+  final TextEditingController _motherNameController = TextEditingController();
+  final TextEditingController _motherIdNumberController =
+      TextEditingController();
+  final TextEditingController _guardianNameController = TextEditingController();
+  final TextEditingController _guardianIdNoController = TextEditingController();
+  final TextEditingController _guardianPhoneController =
+      TextEditingController();
+  final TextEditingController _guardianAddressController =
+      TextEditingController();
+  final TextEditingController _guardianRelationController =
+      TextEditingController();
+  final TextEditingController _schoolNameController = TextEditingController();
+  final TextEditingController _schoolLevelController = TextEditingController();
+  final TextEditingController _healthStatusController = TextEditingController();
+  final TextEditingController _notesController = TextEditingController();
+  final TextEditingController _sponsorshipAmountController =
+      TextEditingController();
+  final TextEditingController _sponsorshipStartsController =
+      TextEditingController();
+  final TextEditingController _sponsorshipEndsController =
+      TextEditingController();
+  final TextEditingController _idCardUrlController = TextEditingController();
+  final TextEditingController _deathCertificateUrlController =
+      TextEditingController();
+  final TextEditingController _orphanPhotoUrlController =
+      TextEditingController();
 
-  // Variables for dropdowns and date picker
-  DateTime? _latestSupportDate;
-  String? _selectedFamilyMembers;
-  String? _selectedAge;
-  String? _selectedGovernorate;
-  String? _selectedRelationship;
-  String? _selectedGender;
-  String? _selectedCauseOfDeath;
-
+  // Variables
+  String _gender = 'ذكر';
+  String _sponsorshipStatus = 'مكفول';
   bool _isLoading = true;
   String? _errorMessage;
+  Map<String, dynamic>? orphanData;
 
   @override
   void initState() {
@@ -44,614 +70,310 @@ class _EditOrphanDetailsScreenState extends State<EditOrphanDetailsScreen> {
     _fetchOrphanDetails();
   }
 
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _phoneController.dispose();
-    _idNumberController.dispose();
-    _orphanNoController.dispose();
-    _profileImageUrlController.dispose();
-    _totalSupportController.dispose();
-    super.dispose();
-  }
-
   Future<void> _fetchOrphanDetails() async {
     try {
-      final docSnapshot = await _firestore
-          .collection('orphans')
-          .doc(widget.orphanId)
-          .get();
+      final docSnapshot =
+          await _firestore.collection('orphans').doc(widget.orphanId).get();
 
       if (docSnapshot.exists) {
-        final data = docSnapshot.data() as Map<String, dynamic>;
-
+        orphanData = docSnapshot.data() as Map<String, dynamic>;
         setState(() {
-          _nameController.text = data['name'] ?? '';
-          _phoneController.text = data['phone'] ?? '';
-          _idNumberController.text = data['idNumber'] ?? '';
-          _orphanNoController.text = data['orphanNo'] ?? '';
-          _profileImageUrlController.text = data['profileImageUrl'] ?? '';
-          _totalSupportController.text = (data['totalSupport'] ?? 0)
-              .toString(); // Assuming a single value for display
-
-          if (data['latestSupportDate'] is Timestamp) {
-            _latestSupportDate = (data['latestSupportDate'] as Timestamp)
-                .toDate();
-          } else if (data['latestSupportDate'] is String) {
-            try {
-              _latestSupportDate = DateTime.parse(data['latestSupportDate']);
-            } catch (e) {
-              print(
-                'Error parsing date string: ${data['latestSupportDate']} - $e',
-              );
-              _latestSupportDate = null;
-            }
-          }
-
-          _selectedFamilyMembers = data['familyMembers']?.toString();
-          _selectedAge = data['age']
-              ?.toString(); // Assuming age is stored as a string or can be converted
-          _selectedGovernorate = data['governorate'];
-          _selectedRelationship = data['relationshipToDeceased'];
-          _selectedGender = data['gender'];
-          _selectedCauseOfDeath = data['causeOfDeath'];
-
+          _birthdateController.text =
+              _formatDate(orphanData?['dateOfBirth']) ;
+          _nameController.text = orphanData?['name'] ?? '';
+          _orphanIdNumberController.text =
+              orphanData?['orphanIdNumber']?.toString() ?? '';
+          _motherNameController.text = orphanData?['motherName'] ?? '';
+          _motherIdNumberController.text =
+              orphanData?['motherIdNumber']?.toString() ?? '';
+          _gender = orphanData?['gender'] ?? 'ذكر';
+          _sponsorshipStatus =
+              orphanData?['sponsorship_status'] ?? 'مكفول';
+          _sponsorshipAmountController.text =
+              orphanData?['sponsorshipAmount']?.toString() ?? '';
+          _schoolNameController.text = orphanData?['schoolName'] ?? '';
+          _schoolLevelController.text = orphanData?['educationLevel'] ?? '';
+          _healthStatusController.text = orphanData?['healthStatus'] ?? '';
+          _notesController.text = orphanData?['notes'] ?? '';
+          _idCardUrlController.text = orphanData?['idCardUrl'] ?? '';
+          _deathCertificateUrlController.text =
+              orphanData?['deathCertificateUrl'] ?? '';
+          _orphanPhotoUrlController.text = orphanData?['orphanPhotoUrl'] ?? '';
           _isLoading = false;
         });
       } else {
         setState(() {
+          _errorMessage = 'بيانات اليتيم غير موجودة.';
           _isLoading = false;
-          _errorMessage = 'Orphan not found.';
         });
       }
     } catch (e) {
       setState(() {
+        _errorMessage = 'فشل في تحميل البيانات: $e';
         _isLoading = false;
-        _errorMessage = 'Error loading orphan details: $e';
       });
-      print('Error fetching orphan details: $e');
     }
   }
 
-  Future<void> _updateOrphanDetails() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
+  String _formatDate(dynamic date) {
+    if (date is Timestamp) {
+      return DateFormat('yyyy-MM-dd').format(date.toDate());
+    } else if (date is DateTime) {
+      return DateFormat('yyyy-MM-dd').format(date);
     }
+    return date.toString();
+  }
 
-    setState(() {
-      _isLoading = true;
-    });
+  Future<void> _selectDate(
+    BuildContext context,
+    TextEditingController controller,
+  ) async {
+    final DateTime? pickedDate = await showDatePicker(
+      context: context,
+      initialDate: DateTime.tryParse(controller.text) ?? DateTime.now(),
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now().add(const Duration(days: 365 * 10)),
+    );
+    if (pickedDate != null) {
+      controller.text = DateFormat('yyyy-MM-dd').format(pickedDate);
+    }
+  }
 
-    try {
-      await _firestore.collection('orphans').doc(widget.orphanId).update({
-        'name': _nameController.text,
-        'phone': _phoneController.text,
-        'idNumber': _idNumberController.text,
-        'orphanNo': _orphanNoController.text,
-        'profileImageUrl': _profileImageUrlController.text,
-        'totalSupport': double.tryParse(_totalSupportController.text) ?? 0.0,
-        'latestSupportDate': _latestSupportDate != null
-            ? Timestamp.fromDate(_latestSupportDate!)
-            : null,
-        'familyMembers': _selectedFamilyMembers != null
-            ? int.tryParse(_selectedFamilyMembers!)
-            : null,
-        'age': _selectedAge != null
-            ? int.tryParse(_selectedAge!)
-            : null, // Store as int if possible
-        'governorate': _selectedGovernorate,
-        'relationshipToDeceased': _selectedRelationship,
-        'gender': _selectedGender,
-        'causeOfDeath': _selectedCauseOfDeath,
-        // institutionId should not be changed here, it's assigned on creation
-      });
+  void _saveChanges() {
+    if (_formKey.currentState!.validate()) {
+      final updatedData = {
+        'name': _nameController.text.trim(),
+        'orphanIdNumber': _orphanIdNumberController.text.trim(),
+        'motherName': _motherNameController.text.trim(),
+        'motherIdNumber': _motherIdNumberController.text.trim(),
+        'gender': _gender,
+        'sponsorship_status': _sponsorshipStatus,
+        'sponsorshipAmount': _sponsorshipAmountController.text.trim(),
+        'schoolName': _schoolNameController.text.trim(),
+        'educationLevel': _schoolLevelController.text.trim(),
+        'healthStatus': _healthStatusController.text.trim(),
+        'notes': _notesController.text.trim(),
+        'idCardUrl': _idCardUrlController.text.trim(),
+        'deathCertificateUrl': _deathCertificateUrlController.text.trim(),
+        'orphanPhotoUrl': _orphanPhotoUrlController.text.trim(),
+      };
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Orphan details updated successfully!')),
-        );
-        Navigator.pop(context, true); // Pop with true to indicate success
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update orphan details: $e')),
-        );
-      }
-      print('Error updating orphan details: $e');
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      context.read<OrphansBloc>().add(
+            UpdateOrphan(widget.orphanId, updatedData, widget.institutionId),
+          );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF0E8EB),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF6DAF97),
-        elevation: 0,
-        title: const Text(
-          'Edit Orphan Details',
-          style: TextStyle(color: Colors.white),
+    return BlocListener<OrphansBloc, OrphansState>(
+      listener: (context, state) {
+        if (state is OrphansLoaded) {
+          Navigator.of(context).pop();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('تم تحديث بيانات اليتيم بنجاح')),
+          );
+        } else if (state is OrphansError) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('فشل التحديث: ${state.message}')),
+          );
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('تعديل بيانات اليتيم'),
+          backgroundColor: AppColors.primaryColor,
+          elevation: 0,
         ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () {
-            Navigator.pop(context);
-          },
-        ),
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _errorMessage != null
-          ? Center(child: Text(_errorMessage!))
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(20.0),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Profile Image URL (optional, consider image picker for real app)
-                    _buildTextField(
-                      controller: _profileImageUrlController,
-                      label: 'Profile Image URL',
-                      hintText: 'Enter URL for orphan\'s profile image',
-                      icon: Icons.image,
-                      keyboardType: TextInputType.url,
-                    ),
-                    const SizedBox(height: 15),
-
-                    // Name
-                    _buildTextField(
-                      controller: _nameController,
-                      label: 'Name',
-                      hintText: 'Enter orphan\'s full name',
-                      icon: Icons.person,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter a name';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 15),
-
-                    // Phone
-                    _buildTextField(
-                      controller: _phoneController,
-                      label: 'Phone',
-                      hintText: 'Enter orphan\'s phone number',
-                      icon: Icons.phone,
-                      keyboardType: TextInputType.phone,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter a phone number';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 15),
-
-                    // ID Number (if applicable)
-                    _buildTextField(
-                      controller: _idNumberController,
-                      label: 'ID Number',
-                      hintText: 'Enter orphan\'s ID number',
-                      icon: Icons.credit_card,
-                      keyboardType: TextInputType.text,
-                    ),
-                    const SizedBox(height: 15),
-
-                    // Orphan No. (if applicable)
-                    _buildTextField(
-                      controller: _orphanNoController,
-                      label: 'Orphan Number',
-                      hintText: 'Enter orphan\'s unique number',
-                      icon: Icons.numbers,
-                      keyboardType: TextInputType.text,
-                    ),
-                    const SizedBox(height: 15),
-
-                    // Total Support (assuming a single value field for simplicity in editing)
-                    _buildTextField(
-                      controller: _totalSupportController,
-                      label: 'Total Support Amount (\$)',
-                      hintText: 'e.g., 500.00',
-                      icon: Icons.attach_money,
-                      keyboardType: TextInputType.number,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter total support';
-                        }
-                        if (double.tryParse(value) == null) {
-                          return 'Please enter a valid number';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 15),
-
-                    // Latest Support Date
-                    _buildDateField(
-                      label: 'Latest Support Date',
-                      selectedDate: _latestSupportDate,
-                      onTap: () async {
-                        final pickedDate = await showDatePicker(
-                          context: context,
-                          initialDate: _latestSupportDate ?? DateTime.now(),
-                          firstDate: DateTime(2000),
-                          lastDate: DateTime.now().add(
-                            const Duration(days: 365),
+        body: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _errorMessage != null
+                ? Center(child: Text(_errorMessage!))
+                : SingleChildScrollView(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        children: [
+                          _buildTextField(_nameController, 'اسم اليتيم'),
+                          const SizedBox(height: 15),
+                          _buildDateField(
+                              _birthdateController, 'تاريخ الميلاد'),
+                          const SizedBox(height: 15),
+                          _buildDropdownField(
+                            'الجنس',
+                            _gender,
+                            ['ذكر', 'أنثى'],
+                            (val) => setState(() => _gender = val!),
                           ),
-                        );
-                        if (pickedDate != null &&
-                            pickedDate != _latestSupportDate) {
-                          setState(() {
-                            _latestSupportDate = pickedDate;
-                          });
-                        }
-                      },
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please select a date';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Dropdown for Family Members
-                    _buildDropdownField<String>(
-                      label: 'Total Family Members',
-                      value: _selectedFamilyMembers,
-                      items: [
-                        '1',
-                        '2',
-                        '3',
-                        '4',
-                        '5',
-                        '6',
-                        '7',
-                        '8',
-                        '9',
-                        '10+',
-                      ], // Adjust as needed
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedFamilyMembers = value;
-                        });
-                      },
-                      icon: Icons.group,
-                      validator: (value) {
-                        if (value == null) {
-                          return 'Please select family members';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 15),
-
-                    // Dropdown for Age
-                    _buildDropdownField<String>(
-                      label: 'Age',
-                      value: _selectedAge,
-                      items:
-                          List<String>.generate(19, (i) => (i + 1).toString()) +
-                          ['19+'], // 1-18, then 19+
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedAge = value;
-                        });
-                      },
-                      icon: Icons.child_care,
-                      validator: (value) {
-                        if (value == null) {
-                          return 'Please select age';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 15),
-
-                    // Dropdown for Governorate
-                    _buildDropdownField<String>(
-                      label: 'Governorate',
-                      value: _selectedGovernorate,
-                      items: [
-                        'North Gaza',
-                        'Gaza',
-                        'Khan Yunis',
-                        'Rafah',
-                        'Deir al-Balah',
-                      ],
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedGovernorate = value;
-                        });
-                      },
-                      icon: Icons.location_on,
-                      validator: (value) {
-                        if (value == null) {
-                          return 'Please select governorate';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 15),
-
-                    // Dropdown for Relationship to deceased
-                    _buildDropdownField<String>(
-                      label: 'Relationship to deceased',
-                      value: _selectedRelationship,
-                      items: ['Father', 'Mother', 'Both', 'Other'],
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedRelationship = value;
-                        });
-                      },
-                      icon: Icons.family_restroom,
-                      validator: (value) {
-                        if (value == null) {
-                          return 'Please select relationship';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 15),
-
-                    // Dropdown for Gender
-                    _buildDropdownField<String>(
-                      label: 'Gender',
-                      value: _selectedGender,
-                      items: ['Male', 'Female'],
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedGender = value;
-                        });
-                      },
-                      icon: Icons.people,
-                      validator: (value) {
-                        if (value == null) {
-                          return 'Please select gender';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 15),
-
-                    // Dropdown for Cause of Death
-                    _buildDropdownField<String>(
-                      label: 'Cause Of Death',
-                      value: _selectedCauseOfDeath,
-                      items: [
-                        'Heart Attack',
-                        'Accident',
-                        'Illness',
-                        'War',
-                        'Other',
-                      ],
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedCauseOfDeath = value;
-                        });
-                      },
-                      icon: Icons.sick_outlined,
-                      validator: (value) {
-                        if (value == null) {
-                          return 'Please select cause of death';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 30),
-
-                    Center(
-                      child: _isLoading
-                          ? const CircularProgressIndicator()
-                          : ElevatedButton(
-                              onPressed: _updateOrphanDetails,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF6DAF97),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 50,
-                                  vertical: 15,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                              ),
-                              child: const Text(
-                                'Save Changes',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                          const SizedBox(height: 15),
+                          _buildDropdownField(
+                            'حالة الكفالة',
+                            _sponsorshipStatus,
+                            ['مكفول', 'غير مكفول'],
+                            (val) => setState(() => _sponsorshipStatus = val!),
+                          ),
+                          const SizedBox(height: 15),
+                          _buildTextField(
+                            _sponsorshipAmountController,
+                            'مبلغ الكفالة',
+                            keyboardType: TextInputType.number,
+                          ),
+                          const SizedBox(height: 15),
+                          _buildDateField(_sponsorshipStartsController,
+                              'تاريخ بدء الكفالة'),
+                          const SizedBox(height: 15),
+                          _buildDateField(_sponsorshipEndsController,
+                              'تاريخ انتهاء الكفالة'),
+                          const SizedBox(height: 15),
+                          _buildTextField(
+                              _guardianNameController, 'اسم ولي الأمر'),
+                          const SizedBox(height: 15),
+                          _buildTextField(
+                            _guardianIdNoController,
+                            'رقم هوية ولي الأمر',
+                            keyboardType: TextInputType.number,
+                          ),
+                          const SizedBox(height: 15),
+                          _buildTextField(
+                            _guardianPhoneController,
+                            'رقم جوال ولي الأمر',
+                            keyboardType: TextInputType.phone,
+                          ),
+                          const SizedBox(height: 15),
+                          _buildTextField(
+                              _guardianAddressController, 'عنوان السكن'),
+                          const SizedBox(height: 15),
+                          _buildTextField(
+                              _guardianRelationController, 'صلة القرابة'),
+                          const SizedBox(height: 15),
+                          _buildTextField(_schoolNameController, 'اسم المدرسة'),
+                          const SizedBox(height: 15),
+                          _buildTextField(
+                              _schoolLevelController, 'المستوى التعليمي'),
+                          const SizedBox(height: 15),
+                          _buildTextField(
+                              _healthStatusController, 'الحالة الصحية'),
+                          const SizedBox(height: 15),
+                          _buildTextField(
+                              _notesController, 'ملاحظات إضافية',
+                              maxLines: 3),
+                          const SizedBox(height: 30),
+                          if (_idCardUrlController.text.isNotEmpty)
+                            Image.network(
+                              _idCardUrlController.text,
+                              height: 150,
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                            ),
+                          _buildTextField(
+                              _idCardUrlController, 'رابط صورة الهوية'),
+                          const SizedBox(height: 15),
+                          if (_deathCertificateUrlController.text.isNotEmpty)
+                            Image.network(
+                              _deathCertificateUrlController.text,
+                              height: 150,
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                            ),
+                          _buildTextField(_deathCertificateUrlController,
+                              'رابط شهادة الوفاة'),
+                          const SizedBox(height: 15),
+                          if (_orphanPhotoUrlController.text.isNotEmpty)
+                            Image.network(
+                              _orphanPhotoUrlController.text,
+                              height: 150,
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                            ),
+                          _buildTextField(
+                              _orphanPhotoUrlController, 'رابط صورة اليتيم'),
+                          const SizedBox(height: 30),
+                          ElevatedButton(
+                            onPressed: _saveChanges,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primaryColor,
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 15),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
                               ),
                             ),
+                            child: const Text(
+                              'حفظ التغييرات',
+                              style: TextStyle(
+                                  fontSize: 18, color: Colors.white),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 20),
-                  ],
-                ),
-              ),
-            ),
+                  ),
+      ),
     );
   }
 
-  // Helper widget for building text input fields
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String label,
-    required String hintText,
-    required IconData icon,
+  Widget _buildTextField(
+    TextEditingController controller,
+    String label, {
     TextInputType keyboardType = TextInputType.text,
-    String? Function(String?)? validator,
+    int maxLines = 1,
   }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF4C7F7F),
-          ),
+    return TextFormField(
+      controller: controller,
+      keyboardType: keyboardType,
+      maxLines: maxLines,
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(color: AppColors.primaryColor),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide:
+              const BorderSide(color: AppColors.secondaryColor, width: 2),
         ),
-        const SizedBox(height: 8),
-        TextFormField(
-          controller: controller,
-          keyboardType: keyboardType,
-          decoration: InputDecoration(
-            hintText: hintText,
-            prefixIcon: Icon(icon, color: const Color(0xFF4C7F7F)),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0xFF6DAF97)),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0xFF6DAF97)),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0xFF4C7F7F), width: 2),
-            ),
-            fillColor: Colors.white,
-            filled: true,
-            contentPadding: const EdgeInsets.symmetric(
-              vertical: 12.0,
-              horizontal: 10.0,
-            ),
-          ),
-          validator: validator,
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide:
+              const BorderSide(color: AppColors.primaryColor, width: 2),
         ),
-      ],
+      ),
     );
   }
 
-  // Helper widget for building date selection field
-  Widget _buildDateField({
-    required String label,
-    required DateTime? selectedDate,
-    required VoidCallback onTap,
-    String? Function(String?)? validator,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF4C7F7F),
-          ),
+  Widget _buildDateField(
+      TextEditingController controller, String labelText) {
+    return TextFormField(
+      controller: controller,
+      readOnly: true,
+      decoration: InputDecoration(
+        labelText: labelText,
+        suffixIcon:
+            const Icon(Icons.calendar_today, color: AppColors.primaryColor),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
         ),
-        const SizedBox(height: 8),
-        InkWell(
-          onTap: onTap,
-          child: InputDecorator(
-            decoration: InputDecoration(
-              hintText: 'Select Date',
-              prefixIcon: const Icon(
-                Icons.calendar_today,
-                color: Color(0xFF4C7F7F),
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: Color(0xFF6DAF97)),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: Color(0xFF6DAF97)),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(
-                  color: Color(0xFF4C7F7F),
-                  width: 2,
-                ),
-              ),
-              fillColor: Colors.white,
-              filled: true,
-              contentPadding: const EdgeInsets.symmetric(
-                vertical: 12.0,
-                horizontal: 10.0,
-              ),
-            ),
-            child: Text(
-              selectedDate == null
-                  ? ''
-                  : DateFormat('yyyy/MM/dd').format(selectedDate),
-              style: const TextStyle(fontSize: 16, color: Colors.black87),
-            ),
-          ),
-        ),
-      ],
+      ),
+      onTap: () => _selectDate(context, controller),
     );
   }
 
-  // Helper widget for building dropdown fields
-  Widget _buildDropdownField<T>({
-    required String label,
-    required T? value,
-    required List<T> items,
-    required ValueChanged<T?> onChanged,
-    required IconData icon,
-    String? Function(T?)? validator,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF4C7F7F),
-          ),
-        ),
-        const SizedBox(height: 8),
-        DropdownButtonFormField<T>(
-          value: value,
-          decoration: InputDecoration(
-            prefixIcon: Icon(icon, color: const Color(0xFF4C7F7F)),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0xFF6DAF97)),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0xFF6DAF97)),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0xFF4C7F7F), width: 2),
-            ),
-            fillColor: Colors.white,
-            filled: true,
-            contentPadding: const EdgeInsets.symmetric(
-              vertical: 12.0,
-              horizontal: 10.0,
-            ),
-          ),
-          hint: Text('Select $label'),
-          icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF4C7F7F)),
-          items: items.map<DropdownMenuItem<T>>((T item) {
-            return DropdownMenuItem<T>(
-              value: item,
-              child: Text(item.toString()),
-            );
-          }).toList(),
-          onChanged: onChanged,
-          validator: validator,
-        ),
-      ],
+  Widget _buildDropdownField(
+    String label,
+    String currentValue,
+    List<String> items,
+    Function(String?) onChanged,
+  ) {
+    return DropdownButtonFormField<String>(
+      value: currentValue,
+      decoration: InputDecoration(
+        labelText: label,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+      items: items
+          .map((value) =>
+              DropdownMenuItem<String>(value: value, child: Text(value)))
+          .toList(),
+      onChanged: onChanged,
     );
   }
 }

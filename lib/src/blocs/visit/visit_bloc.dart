@@ -18,26 +18,37 @@ class VisitBloc extends Bloc<VisitEvent, VisitState> {
     on<DeleteVisit>(_onDeleteVisit);
     on<LoadAllVisits>(_onLoadAllVisits);
   }
-
   Future<void> _onLoadVisitsByStatus(
-      LoadVisitsByStatus event, Emitter<VisitState> emit) async {
-    emit(VisitLoading());
-    try {
-      final visits = await firestoreService.getVisitsByStatus(
-          event.institutionId, event.status);
-      emit(VisitLoaded(
-          scheduledVisits: event.status == 'مجدولة' ? visits : [],
-          completedVisits: event.status == 'مكتملة' ? visits : []));
-    } catch (e) {
-      emit(VisitError("Failed to load visits by status: $e"));
+    LoadVisitsByStatus event, Emitter<VisitState> emit) async {
+  try {
+    final visits = await firestoreService.getAllVisits(
+        event.institutionId, event.status);
+
+    List<Map<String, dynamic>> scheduled = [];
+    List<Map<String, dynamic>> completed = [];
+
+    if (state is VisitLoaded) {
+      scheduled = List.from((state as VisitLoaded).scheduledVisits);
+      completed = List.from((state as VisitLoaded).completedVisits);
     }
+
+    if (event.status == 'مجدولة') {
+      scheduled = visits;
+    } else if (event.status == 'مكتملة') {
+      completed = visits;
+    }
+
+    emit(VisitLoaded(scheduledVisits: scheduled, completedVisits: completed));
+  } catch (e) {
+    emit(VisitError("Failed to load visits by status: $e"));
   }
+}
 
   Future<void> _onLoadAllVisits(LoadAllVisits event, Emitter<VisitState> emit) async {
     emit(VisitLoading());
     try {
-      final scheduled = await firestoreService.getVisitsByStatus(event.institutionId, 'مجدولة');
-      final completed = await firestoreService.getVisitsByStatus(event.institutionId, 'مكتملة');
+      final scheduled = await firestoreService.getAllVisits(event.institutionId, 'مجدولة');
+      final completed = await firestoreService.getAllVisits(event.institutionId, 'مكتملة');
       emit(VisitLoaded(scheduledVisits: scheduled, completedVisits: completed));
     } catch (e) {
       emit(VisitError("Failed to load all visits: $e"));
@@ -64,27 +75,31 @@ class VisitBloc extends Bloc<VisitEvent, VisitState> {
     }
   }
 
-  Future<void> _onUpdateVisit(
-      UpdateVisit event, Emitter<VisitState> emit) async {
-    try {
-      await firestoreService.updateVisit(event.id, event.updates);
+Future<void> _onUpdateVisit(
+    UpdateVisit event, Emitter<VisitState> emit) async {
+  try {
+    await firestoreService.updateVisit(event.id, event.updates);
 
-      if (event.updates['status'] == 'مكتملة') {
-        await _sendNotificationToAll(
-            "تمت زيارة: ${event.updates['name'] ?? ''}");
-      } else {
-        await _sendNotificationToAll(
-            "تم تعديل موعد زيارة: ${event.updates['name'] ?? ''}");
-      }
-
-      final institutionId = event.updates['institutionId'];
-      if (institutionId != null) {
-        add(LoadAllVisits(institutionId: institutionId));
-      }
-    } catch (e) {
-      emit(VisitError("Failed to update visit: $e"));
+    // إرسال إشعار حسب الحالة
+    final newStatus = event.updates['status'];
+    final visitName = event.updates['name'] ?? '';
+    if (newStatus == 'مكتملة') {
+      await _sendNotificationToAll("تمت زيارة: $visitName");
+    } else if (newStatus == 'مجدولة') {
+      await _sendNotificationToAll("تم إعادة الزيارة $visitName إلى المجدولة");
+    } else {
+      await _sendNotificationToAll("تم تعديل موعد زيارة: $visitName");
     }
+
+    // إعادة تحميل جميع الزيارات
+    final institutionId = event.updates['institutionId'] ?? event.institutionId;
+    if (institutionId != null) {
+      add(LoadAllVisits(institutionId: institutionId));
+    }
+  } catch (e) {
+    emit(VisitError("Failed to update visit: $e"));
   }
+}
 
   Future<void> _onDeleteVisit(
       DeleteVisit event, Emitter<VisitState> emit) async {

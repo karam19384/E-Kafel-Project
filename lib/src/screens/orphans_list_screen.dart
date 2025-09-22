@@ -1,4 +1,5 @@
 // lib/src/screens/orphans_list_screen.dart
+import 'package:e_kafel/src/screens/orphan_details_acreen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:e_kafel/src/blocs/home/home_bloc.dart';
@@ -39,7 +40,9 @@ class _OrphansListScreenState extends State<OrphansListScreen> {
   void _fetchOrphans() {
     final homeState = BlocProvider.of<HomeBloc>(context).state;
     if (homeState is HomeLoaded) {
-      context.read<OrphansBloc>().add(LoadOrphans());
+      context.read<OrphansBloc>().add(
+        LoadOrphans(institutionId: homeState.institutionId),
+      );
     }
   }
 
@@ -56,7 +59,7 @@ class _OrphansListScreenState extends State<OrphansListScreen> {
             (orphan['name'] ?? '').toString().toLowerCase().contains(
               searchText,
             ) ||
-            (orphan['idNumber'] ?? '').toString().toLowerCase().contains(
+            (orphan['orphanIdNumber'] ?? '').toString().toLowerCase().contains(
               searchText,
             ) ||
             (orphan['orphanNo'] ?? '').toString().toLowerCase().contains(
@@ -197,6 +200,15 @@ class _OrphansListScreenState extends State<OrphansListScreen> {
                   phone: orphanData['mobileNumber'] ?? 'N/A',
                   latestSupport: 'Latest Support: $latestSupport',
                   imageUrl: orphanData['profileImageUrl'] ?? '',
+                  onTap: () {
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            OrphanDetailsScreen(orphanId: orphanData['id']),
+                      ),
+                    );
+                  },
                 );
               },
             );
@@ -210,56 +222,63 @@ class _OrphansListScreenState extends State<OrphansListScreen> {
 
   Widget _buildOrphanCard({
     required String name,
-    required String phone,
+    required int phone,
     required String latestSupport,
     String? imageUrl,
+    required VoidCallback onTap,
   }) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 15),
-      color: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(15.0),
-        child: Row(
-          children: [
-            CircleAvatar(
-              radius: 30,
-              backgroundColor: const Color(0xFF6DAF97),
-              backgroundImage: imageUrl != null && imageUrl.isNotEmpty
-                  ? NetworkImage(imageUrl)
-                  : null,
-              child: imageUrl == null || imageUrl.isEmpty
-                  ? const Icon(Icons.person, color: Colors.white, size: 30)
-                  : null,
-            ),
-            const SizedBox(width: 15),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Name: $name',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF4C7F7F),
-                    ),
-                  ),
-                  const SizedBox(height: 5),
-                  Text(
-                    'Phone: $phone',
-                    style: const TextStyle(fontSize: 14, color: Colors.black87),
-                  ),
-                  const SizedBox(height: 5),
-                  Text(
-                    latestSupport,
-                    style: const TextStyle(fontSize: 12, color: Colors.grey),
-                  ),
-                ],
+    return InkWell(
+      onTap: onTap,
+      child: Card(
+        margin: const EdgeInsets.only(bottom: 15),
+        color: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        elevation: 2,
+        child: Padding(
+          padding: const EdgeInsets.all(15.0),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 30,
+                backgroundColor: const Color(0xFF6DAF97),
+                backgroundImage: imageUrl != null && imageUrl.isNotEmpty
+                    ? NetworkImage(imageUrl)
+                    : null,
+                child: imageUrl == null || imageUrl.isEmpty
+                    ? const Icon(Icons.person, color: Colors.white, size: 30)
+                    : null,
               ),
-            ),
-          ],
+              const SizedBox(width: 15),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Name: $name',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF4C7F7F),
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      'Phone: $phone',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      latestSupport,
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -431,9 +450,9 @@ class _OrphansListScreenState extends State<OrphansListScreen> {
             userName: state.userName,
             userRole: state.userRole,
             profileImageUrl: state.profileImageUrl,
-            orphanCount: state.orphanSponsored,
-            taskCount: state.completedTasksPercentage,
-            visitCount: state.completedFieldVisits,
+            orphanCount: state.totalOrphans,
+            taskCount: state.totalTasks,
+            visitCount: state.totalVisits,
             onLogout: () {
               context.read<AuthBloc>().add(LogoutButtonPressed());
               Navigator.of(context).pushAndRemoveUntil(

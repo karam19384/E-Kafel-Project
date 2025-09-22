@@ -162,13 +162,13 @@ class _AddNewOrphanScreenState extends State<AddNewOrphanScreen> {
       deceasedName: _deceasedNameController.text,
       causeOfDeath: _selectedCauseOfDeath,
       dateOfDeath: _dateOfDeath,
-      deceasedIdNumber: _deceasedIdNumberController.text,
+      deceasedIdNumber: int.tryParse(_deceasedIdNumberController.text),
       gender: _selectedGender,
-      orphanIdNumber: _orphanIdNumberController.text,
+      orphanIdNumber: int.tryParse(_orphanIdNumberController.text)?? 0,
       dateOfBirth: _dateOfBirth,
-      motherIdNumber: _motherIdNumberController.text,
+      motherIdNumber: int.tryParse(_motherIdNumberController.text),
       motherName: _motherNameController.text,
-      breadwinnerIdNumber: _breadwinnerIdNumberController.text,
+      breadwinnerIdNumber: int.tryParse(_breadwinnerIdNumberController.text),
       breadwinnerName: _breadwinnerNameController.text,
       breadwinnerMaritalStatus: _selectedMaritalStatus,
       breadwinnerKinship: _selectedKinship,
@@ -178,9 +178,9 @@ class _AddNewOrphanScreenState extends State<AddNewOrphanScreen> {
       numberOfMales: int.tryParse(_numberOfMalesController.text) ?? 0,
       numberOfFemales: int.tryParse(_numberOfFemalesController.text) ?? 0,
       totalFamilyMembers: int.tryParse(_totalFamilyMembersController.text) ?? 0,
-      mobileNumber: _mobileNumberController.text,
-      phoneNumber: _phoneNumberController.text,
-      orphanNo: '', // سيتم توليده تلقائياً
+      mobileNumber: int.tryParse(_mobileNumberController.text),
+      phoneNumber:  int.tryParse(_phoneNumberController.text),
+      orphanNo: 000000, // سيتم توليده تلقائياً
       schoolName: _schoolNameController.text,
       grade: _gradeController.text,
       educationLevel: _educationLevelController.text,
@@ -296,7 +296,6 @@ class _AddNewOrphanScreenState extends State<AddNewOrphanScreen> {
                     });
                   },
                 ),
-                // ✅ استخدام دالة بناء حقل التاريخ المعدلة
                 _buildDateField(
                   label: 'تاريخ الوفاة',
                   date: _dateOfDeath,
@@ -621,7 +620,6 @@ class _AddNewOrphanScreenState extends State<AddNewOrphanScreen> {
     );
   }
 
-  // ✅ دالة بناء حقل التاريخ المعدلة
   Widget _buildDateField({
     required String label,
     required DateTime? date,
@@ -645,7 +643,7 @@ class _AddNewOrphanScreenState extends State<AddNewOrphanScreen> {
               borderRadius: BorderRadius.circular(10),
               borderSide: const BorderSide(color: Color(0xFF6DAF97)),
             ),
-            errorText: errorText, // ✅ استخدام متغير الحالة لعرض الخطأ
+            errorText: errorText,
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,

@@ -29,18 +29,11 @@ class _FieldVisitsScreenState extends State<FieldVisitsScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-     final homeState = context.read<HomeBloc>().state;
-    if (homeState is HomeLoaded) {
-      _loadAllVisits(homeState.institutionId);
-    }
-  }
-
-  void _loadAllVisits(String institutionId) {
     final homeState = context.read<HomeBloc>().state;
     if (homeState is HomeLoaded) {
-      context
-          .read<VisitBloc>()
-          .add(LoadAllVisits(institutionId: homeState.institutionId));
+      context.read<VisitBloc>().add(
+        LoadAllVisits(institutionId: homeState.institutionId),
+      );
     }
   }
 
@@ -70,7 +63,7 @@ class _FieldVisitsScreenState extends State<FieldVisitsScreen>
     if (pickedTime != null) setState(() => _selectedTime = pickedTime);
   }
 
-void _saveVisit() {
+  void _saveVisit() {
     if (_formKey.currentState!.validate()) {
       final finalDate = DateTime(
         _selectedDate.year,
@@ -82,25 +75,29 @@ void _saveVisit() {
 
       final homeState = context.read<HomeBloc>().state;
       if (homeState is HomeLoaded) {
-        final institutionId = homeState.institutionId; 
-        context.read<VisitBloc>().add(AddVisit(
-              date: finalDate,
-              name: _titleController.text,
-              location: _addressController.text,
-              institutionId: institutionId,
-            ));
+        final institutionId = homeState.institutionId;
+        context.read<VisitBloc>().add(
+          AddVisit(
+            date: finalDate,
+            name: _titleController.text,
+            location: _addressController.text,
+            institutionId: institutionId,
+          ),
+        );
       }
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('تم حفظ الزيارة بنجاح')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('تم حفظ الزيارة بنجاح')));
     }
-}
+  }
 
-  
-void _showUpdateDialog(Map<String, dynamic> visit) {
+
+  void _showUpdateDialog(Map<String, dynamic> visit) {
     _titleController.text = visit['name'];
     _addressController.text = visit['location'];
-    final visitDateTime = DateTime.parse(visit['date']);
+
+    final visitDateTime = DateTime.tryParse(visit['date']) ?? DateTime.now();
     _selectedDate = visitDateTime;
     _selectedTime = TimeOfDay.fromDateTime(visitDateTime);
 
@@ -108,7 +105,9 @@ void _showUpdateDialog(Map<String, dynamic> visit) {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('تعديل الزيارة'),
+          title: Text(
+            visit['status'] == 'مجدولة' ? 'تعديل الزيارة' : 'تفاصيل الزيارة',
+          ),
           content: SingleChildScrollView(
             child: Form(
               key: _formKey,
@@ -117,23 +116,36 @@ void _showUpdateDialog(Map<String, dynamic> visit) {
                 children: [
                   TextFormField(
                     controller: _titleController,
-                    decoration: const InputDecoration(labelText: 'عنوان الزيارة'),
-                    validator: (value) => value!.isEmpty ? 'لا يمكن أن يكون العنوان فارغًا' : null,
+                    decoration: const InputDecoration(
+                      labelText: 'عنوان الزيارة',
+                    ),
+                    validator: (value) => value!.isEmpty
+                        ? 'لا يمكن أن يكون العنوان فارغًا'
+                        : null,
+                    enabled:
+                        visit['status'] ==
+                        'مجدولة', // لا يمكن التعديل إلا للزيارات المجدولة
                   ),
                   TextFormField(
                     controller: _addressController,
-                    decoration: const InputDecoration(labelText: 'موقع الزيارة'),
-                    validator: (value) => value!.isEmpty ? 'لا يمكن أن يكون الموقع فارغًا' : null,
+                    decoration: const InputDecoration(
+                      labelText: 'موقع الزيارة',
+                    ),
+                    validator: (value) =>
+                        value!.isEmpty ? 'لا يمكن أن يكون الموقع فارغًا' : null,
+                    enabled: visit['status'] == 'مجدولة',
                   ),
                   ListTile(
-                    title: Text("التاريخ: ${_selectedDate.toLocal().toString().split(' ')[0]}"),
+                    title: Text(
+                      "التاريخ: ${_selectedDate.toLocal().toString().split(' ')[0]}",
+                    ),
                     trailing: const Icon(Icons.keyboard_arrow_down),
-                    onTap: _selectDate,
+                    onTap: visit['status'] == 'مجدولة' ? _selectDate : null,
                   ),
                   ListTile(
                     title: Text("الوقت: ${_selectedTime.format(context)}"),
                     trailing: const Icon(Icons.keyboard_arrow_down),
-                    onTap: _selectTime,
+                    onTap: visit['status'] == 'مجدولة' ? _selectTime : null,
                   ),
                 ],
               ),
@@ -141,9 +153,7 @@ void _showUpdateDialog(Map<String, dynamic> visit) {
           ),
           actions: [
             TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
+              onPressed: () => Navigator.of(context).pop(),
               child: const Text('إلغاء'),
             ),
             if (visit['status'] == 'مجدولة')
@@ -152,58 +162,83 @@ void _showUpdateDialog(Map<String, dynamic> visit) {
                   final homeState = context.read<HomeBloc>().state;
                   if (homeState is HomeLoaded) {
                     context.read<VisitBloc>().add(
-                          UpdateVisit(
-                            id: visit['id'],
-                            updates: {
-                              'status': 'مكتملة',
-                              'name': visit['name'],
-                            },
-                            institutionId: homeState.institutionId, // ✅ إضافة الـ ID
-                          ),
-                        );
+                      UpdateVisit(
+                        id: visit['id'],
+                        updates: {
+                          'status': 'مكتملة',
+                          'name': visit['name'],
+                          'institutionId': homeState.institutionId,
+                        },
+                        institutionId: homeState.institutionId,
+                      ),
+                    );
                   }
                   Navigator.of(context).pop();
                 },
                 child: const Text('تمت الزيارة'),
               ),
-            ElevatedButton(
-              onPressed: () {
-                if (_formKey.currentState!.validate()) {
-                  final finalDate = DateTime(
-                    _selectedDate.year,
-                    _selectedDate.month,
-                    _selectedDate.day,
-                    _selectedTime.hour,
-                    _selectedTime.minute,
-                  );
+            if (visit['status'] == 'مكتملة')
+              TextButton(
+                onPressed: () {
                   final homeState = context.read<HomeBloc>().state;
                   if (homeState is HomeLoaded) {
                     context.read<VisitBloc>().add(
-                          UpdateVisit(
-                            id: visit['id'],
-                            updates: {
-                              'name': _titleController.text,
-                              'location': _addressController.text,
-                              'date': finalDate.toIso8601String(),
-                            },
-                            institutionId: homeState.institutionId, // ✅ إضافة الـ ID
-                          ),
-                        );
+                      UpdateVisit(
+                        id: visit['id'],
+                        updates: {
+                          'status': 'مجدولة',
+                          'name': visit['name'],
+                          'institutionId': homeState.institutionId,
+                        },
+                        institutionId: homeState.institutionId,
+                      ),
+                    );
                   }
                   Navigator.of(context).pop();
-                }
-              },
-              child: const Text('حفظ التغييرات'),
-            ),
+                },
+                child: const Text('إعادة إلى مجدولة'),
+              ),
+            if (visit['status'] == 'مجدولة')
+              ElevatedButton(
+                onPressed: () {
+                  if (_formKey.currentState!.validate()) {
+                    final finalDate = DateTime(
+                      _selectedDate.year,
+                      _selectedDate.month,
+                      _selectedDate.day,
+                      _selectedTime.hour,
+                      _selectedTime.minute,
+                    );
+
+                    final homeState = context.read<HomeBloc>().state;
+                    if (homeState is HomeLoaded) {
+                      context.read<VisitBloc>().add(
+                        UpdateVisit(
+                          id: visit['id'],
+                          updates: {
+                            'name': _titleController.text,
+                            'location': _addressController.text,
+                            'date': finalDate.toIso8601String(),
+                            'institutionId': homeState.institutionId,
+                          },
+                          institutionId: homeState.institutionId,
+                        ),
+                      );
+                    }
+                    Navigator.of(context).pop();
+                  }
+                },
+                child: const Text('حفظ التغييرات'),
+              ),
           ],
         );
       },
     );
-}
+  }
 
-Widget _buildVisitList(List<Map<String, dynamic>> visits, String status) {
+  Widget _buildVisitList(List<Map<String, dynamic>> visits, String status) {
     if (visits.isEmpty) {
-      return Center(child: Text('لا توجد زيارات ${status} حاليًا.'));
+      return Center(child: Text('لا توجد زيارات $status حاليًا.'));
     }
     return ListView.builder(
       itemCount: visits.length,
@@ -217,12 +252,12 @@ Widget _buildVisitList(List<Map<String, dynamic>> visits, String status) {
             final homeState = context.read<HomeBloc>().state;
             if (homeState is HomeLoaded) {
               context.read<VisitBloc>().add(
-                    DeleteVisit(
-                      id: visit['id'],
-                      status: visit['status'],
-                      institutionId: homeState.institutionId, // ✅ إضافة الـ ID
-                    ),
-                  );
+                DeleteVisit(
+                  id: visit['id'],
+                  status: visit['status'],
+                  institutionId: homeState.institutionId,
+                ),
+              );
             }
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text('تم حذف زيارة ${visit['name']}')),
@@ -246,7 +281,7 @@ Widget _buildVisitList(List<Map<String, dynamic>> visits, String status) {
         );
       },
     );
-}
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -307,21 +342,33 @@ Widget _buildVisitList(List<Map<String, dynamic>> visits, String status) {
                         children: [
                           TextFormField(
                             controller: _titleController,
-                            decoration: const InputDecoration(labelText: 'عنوان الزيارة'),
-                            validator: (value) => value!.isEmpty ? 'لا يمكن أن يكون العنوان فارغًا' : null,
+                            decoration: const InputDecoration(
+                              labelText: 'عنوان الزيارة',
+                            ),
+                            validator: (value) => value!.isEmpty
+                                ? 'لا يمكن أن يكون العنوان فارغًا'
+                                : null,
                           ),
                           TextFormField(
                             controller: _addressController,
-                            decoration: const InputDecoration(labelText: 'موقع الزيارة'),
-                            validator: (value) => value!.isEmpty ? 'لا يمكن أن يكون الموقع فارغًا' : null,
+                            decoration: const InputDecoration(
+                              labelText: 'موقع الزيارة',
+                            ),
+                            validator: (value) => value!.isEmpty
+                                ? 'لا يمكن أن يكون الموقع فارغًا'
+                                : null,
                           ),
                           ListTile(
-                            title: Text("التاريخ: ${_selectedDate.toLocal().toString().split(' ')[0]}"),
+                            title: Text(
+                              "التاريخ: ${_selectedDate.toLocal().toString().split(' ')[0]}",
+                            ),
                             trailing: const Icon(Icons.keyboard_arrow_down),
                             onTap: _selectDate,
                           ),
                           ListTile(
-                            title: Text("الوقت: ${_selectedTime.format(context)}"),
+                            title: Text(
+                              "الوقت: ${_selectedTime.format(context)}",
+                            ),
                             trailing: const Icon(Icons.keyboard_arrow_down),
                             onTap: _selectTime,
                           ),
@@ -370,7 +417,6 @@ Widget _buildVisitList(List<Map<String, dynamic>> visits, String status) {
             },
           );
         }
-        // حالة التحميل أو الخطأ
         return AppDrawer(
           userName: 'Loading...',
           userRole: '...',
@@ -383,6 +429,4 @@ Widget _buildVisitList(List<Map<String, dynamic>> visits, String status) {
       },
     );
   }
-
-
 }

@@ -17,7 +17,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     on<LoadHomeData>((event, emit) async {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
-        emit(HomeError('User not authenticated.')); // ✅ تعديل هنا
+        emit(HomeError('User not authenticated.')); 
         return;
       }
 
@@ -29,7 +29,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
           final institutionId = userData['institutionId'] as String?;
 
           if (institutionId == null) {
-            emit(HomeError('Institution ID not found.')); // ✅ تعديل هنا
+            emit(HomeError('Institution ID not found.')); 
             return;
           }
 
@@ -42,7 +42,6 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
           final notifications = await _firestoreService.getNotifications(
             user.uid,
           );
-          // قم بإضافة هذا السطر بعد التأكد من وجود الدالة في firestore_service.dart
           final int? totalTasksCount = await _firestoreService.getTasksCount(
             institutionId,
           );
@@ -68,12 +67,12 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
             ),
           );
         } else {
-          emit(HomeError('User data not found.')); // ✅ تعديل هنا
+          emit(HomeError('User data not found.')); 
         }
       } catch (e, stackTrace) {
         print('Error caught in HomeBloc: $e');
         print('StackTrace: $stackTrace');
-        emit(HomeError('Failed to load home data: $e')); // ✅ تعديل هنا
+        emit(HomeError('Failed to load home data: $e')); 
       }
     });
   }

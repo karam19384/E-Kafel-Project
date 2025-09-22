@@ -32,109 +32,89 @@ class OrphansBloc extends Bloc<OrphansEvent, OrphansState> {
         emit(OrphansError(e.toString()));
       }
     });
-    // إضافة يتيم جديد
+   
+        // 📌 Add Orphan
     on<AddOrphan>((event, emit) async {
       try {
         final storage = FirebaseStorage.instance;
-        final firestore = FirebaseFirestore.instance;
 
         String? idCardUrl;
         String? deathCertificateUrl;
         String? orphanPhotoUrl;
-        String? institutionId;
 
-        // رفع بطاقة الهوية
-        if (kIsWeb) {
-          if (event.idCardBytes != null) {
-            final ref = storage.ref().child(
-              'orphans/id_cards/${DateTime.now().millisecondsSinceEpoch}.jpg',
-            );
-            await ref.putData(event.idCardBytes!);
-            idCardUrl = await ref.getDownloadURL();
+        Future<String?> uploadFile({File? file, Uint8List? bytes, required String path}) async {
+          if (kIsWeb && bytes != null) {
+            final ref = storage.ref().child(path);
+            await ref.putData(bytes);
+            return await ref.getDownloadURL();
+          } else if (!kIsWeb && file != null) {
+            final ref = storage.ref().child(path);
+            await ref.putFile(file);
+            return await ref.getDownloadURL();
           }
-        } else {
-          if (event.idCardFile != null) {
-            final ref = storage.ref().child(
-              'orphans/id_cards/${DateTime.now().millisecondsSinceEpoch}.jpg',
-            );
-            await ref.putFile(event.idCardFile!);
-            idCardUrl = await ref.getDownloadURL();
-          }
+          return null;
         }
 
-        // رفع شهادة الوفاة
-        if (kIsWeb) {
-          if (event.deathCertificateBytes != null) {
-            final ref = storage.ref().child(
-              'orphans/death_certificates/${DateTime.now().millisecondsSinceEpoch}.jpg',
-            );
-            await ref.putData(event.deathCertificateBytes!);
-            deathCertificateUrl = await ref.getDownloadURL();
-          }
+        idCardUrl = await uploadFile(
+          file: event.idCardFile,
+          bytes: event.idCardBytes,
+          path: 'orphans/id_cards/${DateTime.now().millisecondsSinceEpoch}.jpg',
+        );
+
+        deathCertificateUrl = await uploadFile(
+          file: event.deathCertificateFile,
+          bytes: event.deathCertificateBytes,
+          path: 'orphans/death_certificates/${DateTime.now().millisecondsSinceEpoch}.jpg',
+        );
+
+        orphanPhotoUrl = await uploadFile(
+          file: event.orphanPhotoFile,
+          bytes: event.orphanPhotoBytes,
+          path: 'orphans/photos/${DateTime.now().millisecondsSinceEpoch}.jpg',
+        );
+
+        // 📌 Get new orphanNo from counter
+        final counterRef = firestore.collection('counters').doc('orphanCounter');
+        final counterSnap = await counterRef.get();
+
+        int newOrphanNo;
+        if (counterSnap.exists) {
+          int lastOrphanNo = counterSnap['lastOrphanNo'] as int;
+          newOrphanNo = lastOrphanNo + 1;
+          await counterRef.update({'lastOrphanNo': newOrphanNo});
         } else {
-          if (event.deathCertificateFile != null) {
-            final ref = storage.ref().child(
-              'orphans/death_certificates/${DateTime.now().millisecondsSinceEpoch}.jpg',
-            );
-            await ref.putFile(event.deathCertificateFile!);
-            deathCertificateUrl = await ref.getDownloadURL();
-          }
+          newOrphanNo = 10000;
+          await counterRef.set({'lastOrphanNo': newOrphanNo});
         }
 
-        // رفع صورة اليتيم
-        if (kIsWeb) {
-          if (event.orphanPhotoBytes != null) {
-            final ref = storage.ref().child(
-              'orphans/photos/${DateTime.now().millisecondsSinceEpoch}.jpg',
-            );
-            await ref.putData(event.orphanPhotoBytes!);
-            orphanPhotoUrl = await ref.getDownloadURL();
-          }
-        } else {
-          if (event.orphanPhotoFile != null) {
-            final ref = storage.ref().child(
-              'orphans/photos/${DateTime.now().millisecondsSinceEpoch}.jpg',
-            );
-            await ref.putFile(event.orphanPhotoFile!);
-            orphanPhotoUrl = await ref.getDownloadURL();
-          }
-        }
-        //  توليد رقم يتيم فريد تلقائياً
-        final orphanNo = firestore.collection('orphans').doc().id;
+        // 📌 Prepare Orphan data
+        final orphanData = event.orphan.copyWith(
+          idCardUrl: idCardUrl,
+          deathCertificateUrl: deathCertificateUrl,
+          orphanPhotoUrl: orphanPhotoUrl,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+          orphanNo: newOrphanNo,
+        );
 
-        // تجهيز بيانات اليتيم كـ Map باستخدام وظيفة toMap()
-        final orphanData = event.orphan
-            .copyWith(
-              institutionId: institutionId,
-              idCardUrl: idCardUrl,
-              deathCertificateUrl: deathCertificateUrl,
-              orphanPhotoUrl: orphanPhotoUrl,
-              createdAt: DateTime.now(),
-              updatedAt: DateTime.now(),
-              orphanNo: orphanNo,
-            )
-            .toMap();
-
-        // حفظ البيانات في Firestore
-        await firestore.collection('orphans').add(orphanData);
+        await firestore.collection('orphans').add(orphanData.toMap());
 
         emit(OrphanAdded());
-        add(LoadOrphans());
+        add(LoadOrphans(institutionId: event.orphan.institutionId));
       } catch (e) {
-        if (kDebugMode) {
-          print('Failed to add orphan: $e');
-        }
+        if (kDebugMode) print('Failed to add orphan: $e');
         emit(OrphansError(e.toString()));
       }
     });
-    // تحديث بيانات يتيم
+
+// تحديث بيانات يتيم
     on<UpdateOrphan>((event, emit) async {
       try {
         await firestore
             .collection('orphans')
             .doc(event.orphanId)
             .update(event.updatedData);
-        add(LoadOrphans());
+        add(LoadOrphans(institutionId: event.institutionId)); // إعادة تحميل الأيتام بعد التحديث
       } catch (e) {
         emit(OrphansError(e.toString()));
       }
@@ -146,10 +126,18 @@ class OrphansBloc extends Bloc<OrphansEvent, OrphansState> {
           "isArchived": true,
           "archivedAt": FieldValue.serverTimestamp(),
         });
-        add(LoadOrphans()); // إعادة تحميل الأيتام بعد الأرشفة
+        add(LoadOrphans(institutionId: event.institutionId)); // إعادة تحميل الأيتام بعد الأرشفة
       } catch (e) {
         emit(OrphansError("Failed to archive orphan: $e"));
       }
     });
   }
 }
+ /*
+    await firestore.updateInstitutionOrphansCount(event.institutionId);
+     await _sendNotificationToAll(
+        "تم أرشفة يتيم بنجاح.", event.institutionId); 
+    add(LoadOrphans(institutionId: event.institutionId)); 
+
+
+    */
