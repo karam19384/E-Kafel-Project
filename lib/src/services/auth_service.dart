@@ -1,68 +1,132 @@
 // lib/src/services/auth_service.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:google_sign_in/google_sign_in.dart';
-import 'package:e_kafel/src/services/firestore_service.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirestoreService _firestoreService = FirestoreService();
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
-    final FirebaseFirestore _firestore = FirebaseFirestore.instance; 
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
+  // ✅ دالة مساعدة لتوليد customId فريد
+  String _generateCustomId() {
+    final random = DateTime.now().millisecondsSinceEpoch % 900000 + 100000;
+    return random.toString();
+  }
 
-  // تسجيل الدخول بالبريد/كلمة مرور أو المعرف الفريد
+  // ✅ دالة لملء البيانات الناقصة للمستخدمين القدامى
+  Future<void> _migrateUserData(
+    String uid,
+    Map<String, dynamic> additionalData,
+  ) async {
+    try {
+      final userDoc = await _firestore.collection('users').doc(uid).get();
+
+      if (!userDoc.exists) {
+        // إنشاء مستخدم جديد في النظام الموحد
+        await _firestore.collection('users').doc(uid).set({
+          'uid': uid,
+          'userRole': additionalData['userRole'] ?? 'supervisor',
+          'institutionId': additionalData['institutionId'] ?? '',
+          'customId': additionalData['customId'] ?? _generateCustomId(),
+          'permissions': additionalData['permissions'] ?? [],
+          'areaResponsibleFor': additionalData['areaResponsibleFor'] ?? '',
+          'functionalLodgment': additionalData['functionalLodgment'] ?? '',
+          'createdAt': FieldValue.serverTimestamp(),
+          'email': additionalData['email'] ?? '',
+          'mobileNumber':
+              additionalData['mobileNumber'] ??
+              additionalData['headMobileNumber'] ??
+              '',
+          'name': additionalData['name'] ?? additionalData['headName'] ?? '',
+          'institutionName': additionalData['institutionName'] ?? '',
+          'address': additionalData['address'] ?? '',
+          'kafalaHeadId': additionalData['userRole'] == 'kafala_head'
+              ? uid
+              : additionalData['kafalaHeadId'] ?? '',
+        });
+      }
+    } catch (e) {
+      print('Migration error: $e');
+    }
+  }
+
+  // ✅ تسجيل الدخول المحسن (يدعم النظام القديم والجديد)
   Future<String?> signIn({
-    required String loginIdentifier, // تم تغيير اسم المتغير
+    required String loginIdentifier,
     required String password,
   }) async {
     String email = loginIdentifier;
-    // التحقق مما إذا كان المعرف هو معرف فريد (6 أرقام)
-    if (loginIdentifier.length == 6 && int.tryParse(loginIdentifier) != null) {
-      final userDoc = await _firestoreService.getUserByCustomId(loginIdentifier);
-      if (userDoc == null) {
-        return 'المعرف غير موجود';
-      }
-      final userData = userDoc.data() as Map<String, dynamic>;
-      email = userData['email'];
-    }
+    Map<String, dynamic>? userData;
 
     try {
-      await _auth.signInWithEmailAndPassword(email: email, password: password);
+      // البحث في النظام الجديد (users collection)
+      if (!loginIdentifier.contains('@')) {
+        final userQuery = await _firestore
+            .collection('users')
+            .where('customId', isEqualTo: loginIdentifier)
+            .limit(1)
+            .get();
+
+        if (userQuery.docs.isNotEmpty) {
+          userData = userQuery.docs.first.data();
+          email = userData['email'] ?? '';
+        } else {
+          // البحث في النظام القديم للتوافق
+          final kafalaQuery = await _firestore
+              .collection('kafala_heads')
+              .where('customId', isEqualTo: loginIdentifier)
+              .limit(1)
+              .get();
+
+          if (kafalaQuery.docs.isNotEmpty) {
+            userData = kafalaQuery.docs.first.data();
+            email = userData['email'] ?? userData['headEmail'] ?? '';
+          } else {
+            final supervisorQuery = await _firestore
+                .collection('supervisors')
+                .where('supervisorNo', isEqualTo: loginIdentifier)
+                .limit(1)
+                .get();
+
+            if (supervisorQuery.docs.isNotEmpty) {
+              userData = supervisorQuery.docs.first.data();
+              email = userData['email'] ?? '';
+            } else {
+              return 'المعرف غير موجود';
+            }
+          }
+        }
+      }
+
+      if (email.isEmpty) return 'لا يوجد بريد مرتبط بالمستخدم';
+
+      // تسجيل الدخول
+      final userCredential = await _auth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      final user = userCredential.user;
+      if (user != null && userData != null) {
+        // ترحيل البيانات إذا لزم الأمر
+        await _migrateUserData(user.uid, userData);
+      }
+
       return null;
     } on FirebaseAuthException catch (e) {
       if (e.code == 'user-not-found') {
-        return 'المستخدم غير موجود. تأكد من إدخال المعرف بشكل صحيح.';
+        return 'المستخدم غير موجود. تأكد من صحة البيانات';
+      } else if (e.code == 'wrong-password') {
+        return 'كلمة المرور غير صحيحة';
       }
       return e.message;
-    }
-  }
-  Future<String?> getUserRole(String uid) async {
-    try {
-      // البحث أولاً في kafala_head
-      final kafalaDoc = await _firestore.collection('kafala_head').doc(uid).get();
-      if (kafalaDoc.exists) {
-        return kafalaDoc.data()?['userRole'] ?? 'kafala_head';
-      }
-
-      // البحث ثانياً في supervisor
-      final supervisorDoc = await _firestore.collection('supervisor').doc(uid).get();
-      if (supervisorDoc.exists) {
-        return supervisorDoc.data()?['userRole'] ?? 'supervisor';
-      }
-
-      return null;
     } catch (e) {
-      print("Error fetching userRole: $e");
-      return null;
+      return e.toString();
     }
   }
-  // تسجيل الخروج
-  Future<void> signOut() async {
-    await _auth.signOut();
-  }
 
-  // تسجيل حساب جديد
+  // ✅ تسجيل حساب جديد مع النظام الموحد
   Future<String?> signUp({
     required String name,
     required String email,
@@ -73,6 +137,9 @@ class AuthService {
     required String headEmail,
     required String headMobileNumber,
     required String userRole,
+    required String institutionId,
+    required String areaResponsibleFor,
+    required String functionalLodgment,
   }) async {
     try {
       final userCredential = await _auth.createUserWithEmailAndPassword(
@@ -83,62 +150,187 @@ class AuthService {
       final user = userCredential.user;
       if (user == null) return 'فشل إنشاء الحساب';
 
-      await _firestoreService.initializeNewInstitution(
-        user.uid,
-        {
-          'name': name,
-          'email': email,
-          'address': address,
-          'website': website,
-          'headName': headName,
-          'headEmail': headEmail,
-          'headMobileNumber': headMobileNumber,
-        },
-        {
-          'uid': user.uid,
+      // ✅ إنشاء معرف فريد
+      final customId = _generateCustomId();
+
+      // ✅ إنشاء وثيقة المؤسسة
+      final institutionRef = _firestore.collection('institutions').doc();
+      final newInstitutionId = institutionRef.id;
+
+      await institutionRef.set({
+        'institutionId': newInstitutionId,
+        'institutionName': name,
+        'email': email,
+        'address': address,
+        'website': website,
+        'createdAt': FieldValue.serverTimestamp(),
+        'kafala_head': {
           'name': headName,
-          'email': headEmail,
-          'headMobileNumber': headMobileNumber,
-          'userRole': userRole,
-          'customId': _firestoreService.generateCustomId(), // توليد وحفظ المعرف الفريد
+          'kafalaHeadEmail': headEmail,
+          'kafalaHeadMobileNumber': headMobileNumber,
+          'customId': customId,
+          'createdAt': FieldValue.serverTimestamp(),
         },
-      );
-      
+      });
+
+      // ✅ إنشاء المستخدم في النظام الموحد
+      await _firestore.collection('users').doc(user.uid).set({
+        'uid': user.uid,
+        'userRole': 'kafala_head',
+        'institutionId': newInstitutionId,
+        'customId': customId,
+        'permissions': ['all'], // جميع الصلاحيات لرئيس القسم
+        'areaResponsibleFor': areaResponsibleFor,
+        'functionalLodgment': functionalLodgment,
+        'createdAt': FieldValue.serverTimestamp(),
+        'email': headEmail,
+        'mobileNumber': headMobileNumber,
+        'name': headName,
+        'institutionName': name,
+        'address': address,
+        'kafalaHeadId': user.uid, // نفس الـ uid لرئيس القسم
+      });
+
       return null;
     } on FirebaseAuthException catch (e) {
       return e.message;
+    } catch (e) {
+      return e.toString();
     }
   }
 
-  // تسجيل الدخول بجوجل
-  Future<String?> signInWithGoogle() async {
+
+  // ✅ إعادة تعيين كلمة المرور
+  Future<String?> resetPassword(String email) async {
     try {
-      final googleUser = await _googleSignIn.signIn();
-      if (googleUser == null) return 'تم إلغاء تسجيل الدخول';
-
-      final googleAuth = await googleUser.authentication;
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-
-      final userCredential = await _auth.signInWithCredential(credential);
-      final user = userCredential.user;
-
-      if (user != null) {
-        final userDoc = await _firestoreService.getUser(user.uid);
-        if (userDoc == null) {
-          // إذا كان المستخدم جديدًا، نقوم بإنشاء مستخدم جديد في Firestore
-          await _firestoreService.createUser(user.uid, {
-            'email': user.email,
-            'name': user.displayName,
-            'role': 'kafala_head', 
-          });
-        }
-      }
+      await _auth.sendPasswordResetEmail(email: email);
       return null;
     } on FirebaseAuthException catch (e) {
       return e.message;
+    } catch (e) {
+      return e.toString();
     }
   }
+
+  // ✅ الحصول على بيانات المستخدم من النظام الموحد
+  Future<Map<String, dynamic>?> getUserData(String uid) async {
+    try {
+      final userDoc = await _firestore.collection('users').doc(uid).get();
+      if (userDoc.exists) {
+        return userDoc.data();
+      }
+
+      // البحث في النظام القديم للتوافق
+      final kafalaDoc = await _firestore
+          .collection('kafala_heads')
+          .doc(uid)
+          .get();
+      if (kafalaDoc.exists) {
+        final data = kafalaDoc.data()!;
+        await _migrateUserData(uid, data); // ترحيل البيانات
+        return data;
+      }
+
+      final supervisorDoc = await _firestore
+          .collection('supervisors')
+          .doc(uid)
+          .get();
+      if (supervisorDoc.exists) {
+        final data = supervisorDoc.data()!;
+        await _migrateUserData(uid, data); // ترحيل البيانات
+        return data;
+      }
+
+      return null;
+    } catch (e) {
+      print('Error getting user data: $e');
+      return null;
+    }
+  }
+
+  Future<void> signOut() async {
+    await _auth.signOut();
+  }
+
+// في auth_service.dart - إضافة هذه الدوال
+Future<String?> createSupervisorAccount({
+  required Map<String, dynamic> supervisorData,
+  required String password,
+}) async {
+  try {
+    final email = supervisorData['email'] as String;
+    final name = supervisorData['fullName'] as String;
+    
+    // إنشاء مستخدم في Authentication
+    final userCredential = await _auth.createUserWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
+
+    final user = userCredential.user;
+    if (user == null) return 'فشل إنشاء الحساب';
+
+    // إعداد البيانات للمشرف
+    final customId = _generateCustomId();
+    
+    final userData = {
+      'uid': user.uid,
+      'userRole': 'supervisor',
+      'institutionId': supervisorData['institutionId'] ?? '',
+      'institutionName': supervisorData['institutionName'] ?? '',
+      'customId': customId,
+      'permissions': supervisorData['permissions'] ?? ['supervisor'],
+      'areaResponsibleFor': supervisorData['areaResponsibleFor'] ?? '',
+      'functionalLodgment': supervisorData['functionalLodgment'] ?? '',
+      'createdAt': FieldValue.serverTimestamp(),
+      'email': email,
+      'mobileNumber': supervisorData['mobileNumber'] ?? '',
+      'name': name,
+      'fullName': name,
+      'address': supervisorData['address'] ?? '',
+      'kafalaHeadId': supervisorData['kafalaHeadId'] ?? '',
+      'isActive': true,
+    };
+
+    // حفظ في Firestore
+    await _firestore.collection('users').doc(user.uid).set(userData);
+    
+    return user.uid;
+  } on FirebaseAuthException catch (e) {
+    return e.message;
+  } catch (e) {
+    return e.toString();
+  }
+}
+
+Future<String?> createUserWithEmailAndPassword({
+  required String email,
+  required String password,
+  required Map<String, dynamic> userData,
+}) async {
+  try {
+    final userCredential = await _auth.createUserWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
+
+    final user = userCredential.user;
+    if (user == null) return null;
+
+    // تأكد من وجود UID في البيانات
+    final dataWithUid = {
+      ...userData,
+      'uid': user.uid,
+      'createdAt': FieldValue.serverTimestamp(),
+      'isActive': true,
+    };
+
+    await _firestore.collection('users').doc(user.uid).set(dataWithUid);
+    return user.uid;
+  } catch (e) {
+    debugPrint('Error creating user with email/password: $e');
+    rethrow;
+  }
+}
+
 }

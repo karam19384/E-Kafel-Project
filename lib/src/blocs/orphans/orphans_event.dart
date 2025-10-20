@@ -1,3 +1,4 @@
+// lib/src/blocs/orphans/orphans_event.dart
 part of 'orphans_bloc.dart';
 
 abstract class OrphansEvent extends Equatable {
@@ -7,57 +8,90 @@ abstract class OrphansEvent extends Equatable {
   List<Object?> get props => [];
 }
 
-// جلب قائمة الأيتام
+// تحميل الأيتام مع فلاتر اختيارية
 class LoadOrphans extends OrphansEvent {
-  final String institutionId; 
-  const LoadOrphans({required this.institutionId}); 
+  final String institutionId;
+  final Map<String, dynamic>? filters;
+  const LoadOrphans({required this.institutionId, this.filters});
+
   @override
-  List<Object?> get props => [institutionId]; 
+  List<Object?> get props => [institutionId, filters];
 }
 
-// إضافة يتيم جديد
+// عدّاد الأيتام المؤرشفين
+class LoadArchivedOrphansCount extends OrphansEvent {
+  final String institutionId;
+  const LoadArchivedOrphansCount({required this.institutionId});
+
+  @override
+  List<Object?> get props => [institutionId];
+}
+
+// البحث
+class SearchOrphans extends OrphansEvent {
+  final String institutionId;
+  final String searchTerm;
+  final Map<String, dynamic>? filters;
+  const SearchOrphans({
+    required this.institutionId,
+    required this.searchTerm,
+    this.filters,
+  });
+
+  @override
+  List<Object?> get props => [institutionId, searchTerm, filters];
+}
+
+// إضافة يتيم (مع ملفات اختيارية)
 class AddOrphan extends OrphansEvent {
-  final Orphan orphan; // النموذج كامل لليتيم
-  final File? idCardFile;
-  final File? deathCertificateFile;
+  final Orphan orphan;
+
   final File? orphanPhotoFile;
-  final Uint8List? idCardBytes;
-  final Uint8List? deathCertificateBytes;
-  final Uint8List? orphanPhotoBytes;
+  final File? fatherIdPhotoFile;
+  final File? motherIdPhotoFile;
+  final File? deceasedPhotoFile;
+  final File? deathCertificateFile;
+  final File? birthCertificateFile;
+  final File? breadwinnerIdPhotoFile;
 
   const AddOrphan({
     required this.orphan,
-    this.idCardFile,
-    this.deathCertificateFile,
     this.orphanPhotoFile,
-    this.idCardBytes,
-    this.deathCertificateBytes,
-    this.orphanPhotoBytes,
+    this.fatherIdPhotoFile,
+    this.motherIdPhotoFile,
+    this.deceasedPhotoFile,
+    this.deathCertificateFile,
+    this.birthCertificateFile,
+    this.breadwinnerIdPhotoFile,
   });
 
   @override
   List<Object?> get props => [
-    orphan,
-    idCardFile,
-    deathCertificateFile,
-    orphanPhotoFile,
-    idCardBytes,
-    deathCertificateBytes,
-    orphanPhotoBytes,
-  ];
+        orphan,
+        orphanPhotoFile,
+        fatherIdPhotoFile,
+        motherIdPhotoFile,
+        deceasedPhotoFile,
+        deathCertificateFile,
+        birthCertificateFile,
+        breadwinnerIdPhotoFile,
+      ];
 }
 
-// تحديث بيانات يتيم
+// تحديث يتيم
 class UpdateOrphan extends OrphansEvent {
   final String orphanId;
-    final String institutionId;
-
+  final String institutionId;
   final Map<String, dynamic> updatedData;
 
-  const UpdateOrphan(this.orphanId, this.updatedData , this.institutionId); 
+  const UpdateOrphan({
+    required this.orphanId,
+    required this.institutionId,
+    required this.updatedData,
+  });
 
   @override
-  List<Object?> get props => [orphanId, updatedData];
+  List<Object?> get props => [orphanId, institutionId, updatedData];
 }
 
 // أرشفة يتيم
@@ -65,8 +99,31 @@ class ArchiveOrphan extends OrphansEvent {
   final String orphanId;
   final String institutionId;
 
-  const ArchiveOrphan(this.orphanId , this.institutionId); 
+  const ArchiveOrphan({
+    required this.orphanId,
+    required this.institutionId,
+  });
 
   @override
-  List<Object> get props => [orphanId];
+  List<Object?> get props => [orphanId, institutionId];
+}
+
+// إرسال إشعار (يدعم orphanId اختياريًا)
+class SendOrphanNotification extends OrphansEvent {
+  final String institutionId;
+  final String title;
+  final String message;
+  final String type;
+  final String? orphanId; // <-- تمت الإضافة
+
+  const SendOrphanNotification({
+    required this.institutionId,
+    required this.title,
+    required this.message,
+    required this.type,
+    this.orphanId, // <-- تمت الإضافة
+  });
+
+  @override
+  List<Object?> get props => [institutionId, title, message, type, orphanId];
 }

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:e_kafel/src/screens/login_screen.dart';
-import 'package:e_kafel/src/screens/home_screen.dart';
-import 'package:e_kafel/src/screens/splash_screen.dart';
+import 'package:e_kafel/src/screens/auth/login_screen.dart';
+import 'package:e_kafel/src/screens/Home/home_screen.dart';
+import 'package:e_kafel/src/screens/auth/splash_screen.dart';
 
 class AuthWrapper extends StatelessWidget {
   const AuthWrapper({super.key});

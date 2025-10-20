@@ -1,5 +1,3 @@
-// lib/src/blocs/auth/auth_event.dart
-
 part of 'auth_bloc.dart';
 
 abstract class AuthEvent extends Equatable {
@@ -14,18 +12,16 @@ class CheckAuthStatus extends AuthEvent {}
 class AppStarted extends AuthEvent {}
 
 class LoginButtonPressed extends AuthEvent {
-  final String email;
   final String password;
   final String loginIdentifier;
 
   const LoginButtonPressed({
-    required this.email,
     required this.password,
     required this.loginIdentifier,
   });
 
   @override
-  List<Object> get props => [email, password];
+  List<Object> get props => [loginIdentifier, password];
 }
 
 class LogoutButtonPressed extends AuthEvent {}
@@ -40,6 +36,9 @@ class SignUpButtonPressed extends AuthEvent {
   final String headEmail;
   final String headMobileNumber;
   final String userRole;
+  final String institutionId;
+  final String areaResponsibleFor;
+  final String functionalLodgment;
 
   const SignUpButtonPressed({
     required this.name,
@@ -51,6 +50,9 @@ class SignUpButtonPressed extends AuthEvent {
     required this.headEmail,
     required this.headMobileNumber,
     required this.userRole,
+    required this.institutionId,
+    required this.areaResponsibleFor,
+    required this.functionalLodgment,
   });
 
   @override
@@ -64,12 +66,26 @@ class SignUpButtonPressed extends AuthEvent {
     headEmail,
     headMobileNumber,
     userRole,
+    institutionId,
+    areaResponsibleFor,
+    functionalLodgment,
   ];
 }
 
-class SignInWithGoogleButtonPressed extends AuthEvent {}
+// ✅ حدث جديد للتسجيل عبر Google
+class GoogleSignInButtonPressed extends AuthEvent {}
 
+// ✅ حدث جديد للتسجيل عبر Facebook
+class FacebookSignInButtonPressed extends AuthEvent {}
 
-class GoogleSignInButtonPressed extends AuthEvent {}  
+// ✅ حدث جديد لإعادة تعيين كلمة المرور
+class ResetPasswordRequested extends AuthEvent {
+  final String email;
 
-class SignOutButtonPressed extends AuthEvent {}   
+  const ResetPasswordRequested({required this.email});
+
+  @override
+  List<Object?> get props => [email];
+}
+
+class SignOutButtonPressed extends AuthEvent {}

@@ -1,26 +1,51 @@
 {
   "project_info": {
-    "project_number": "62114485232",
-    "project_id": "subtle-palisade-463718-s7",
-    "storage_bucket": "subtle-palisade-463718-s7.firebasestorage.app"
+    "project_number": "508451456084",
+    "project_id": "graduation-project-f3148",
+    "storage_bucket": "graduation-project-f3148.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:62114485232:android:430614920ca01aef904335",
+        "mobilesdk_app_id": "1:508451456084:android:0d3a3a075c9c0537ff19c1",
         "android_client_info": {
           "package_name": "com.example.e_kafel"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "508451456084-ejfcof4olhhpj4hc88sjcfajajtk08tj.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.e_kafel",
+            "certificate_hash": "4fb3595ba24d4600ea89c04a5652e7f2396f33f1"
+          }
+        },
+        {
+          "client_id": "508451456084-pispb725js2lr8u264ojtl76efvqndn5.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
-          "current_key": "AIzaSyCSVPnuc440M_LxI2SZIAh1nNYYLN9rXzs"
+          "current_key": "AIzaSyD4P5QclUhf8cninjHqUtGeD78bKqwRysI"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "508451456084-pispb725js2lr8u264ojtl76efvqndn5.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "508451456084-8f1omof81j018sg5udg23b57lkpsh252.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.finalProject3"
+              }
+            }
+          ]
         }
       }
     }

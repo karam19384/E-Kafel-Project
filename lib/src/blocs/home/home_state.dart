@@ -1,7 +1,6 @@
 // lib/src/blocs/home/home_state.dart
 part of 'home_bloc.dart';
 
-@immutable
 abstract class HomeState extends Equatable {
   const HomeState();
 
@@ -14,12 +13,13 @@ class HomeInitial extends HomeState {}
 class HomeLoading extends HomeState {}
 
 class HomeLoaded extends HomeState {
+  final String institutionId;
+  final String kafalaHeadId;
   final String userName;
   final String userRole;
   final String profileImageUrl;
-  final String institutionId;
   final int orphanSponsored;
-  final int completedTasksPercentage;
+  final double completedTasksPercentage;
   final int orphanRequiringUpdates;
   final int supervisorsCount;
   final int completedFieldVisits;
@@ -28,9 +28,11 @@ class HomeLoaded extends HomeState {
   final int totalOrphans;
   final int completedTasks;
   final int totalVisits;
-  final int totalTasks; 
+  final int totalTasks;
+  final int archivedOrphansCount;
 
   const HomeLoaded({
+    required this.kafalaHeadId,
     required this.userName,
     required this.userRole,
     required this.profileImageUrl,
@@ -45,31 +47,34 @@ class HomeLoaded extends HomeState {
     required this.totalOrphans,
     required this.completedTasks,
     required this.totalVisits,
-    required this.totalTasks, 
+    required this.totalTasks,
+    required this.archivedOrphansCount,
   });
 
   @override
   List<Object> get props => [
-        userName,
-        userRole,
-        profileImageUrl,
-        institutionId,
-        orphanSponsored,
-        completedTasksPercentage,
-        orphanRequiringUpdates,
-        supervisorsCount,
-        completedFieldVisits,
-        scheduledVisits,
-        notifications,
-        totalOrphans,
-        completedTasks,
-        totalVisits,
-        totalTasks, 
-      ];
+    userName,
+    userRole,
+    profileImageUrl,
+    institutionId,
+    orphanSponsored,
+    completedTasksPercentage,
+    orphanRequiringUpdates,
+    supervisorsCount,
+    completedFieldVisits,
+    scheduledVisits,
+    notifications,
+    totalOrphans,
+    completedTasks,
+    totalVisits,
+    totalTasks,
+    kafalaHeadId,
+    archivedOrphansCount,
+  ];
 }
 
 class HomeError extends HomeState {
-  final  String message ;
+  final String message;
 
   const HomeError(this.message);
 

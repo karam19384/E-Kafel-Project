@@ -1,527 +1,616 @@
-/*
+// lib/src/models/orphan_model.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class Orphan {
-  final String institutionId;
+  // الحقول الأساسية
   final String? id;
-  final String name;
-  final String deceasedName;
-  final String? causeOfDeath;
-  final DateTime? dateOfDeath;
-  final int? deceasedIdNumber;
-  final String? gender;
-  final int orphanIdNumber;
-  final DateTime? dateOfBirth;
+  final String institutionId;
+  final String kafalaHeadId;
+  final int? orphanNo; // الرقم الفريد لليتيم (5 أرقام)
+
+  // === الإسم الخماسي ===
+  final String orphanName; // اسم اليتيم
+  final String fatherName; // اسم الأب
+  final String grandfatherName; // اسم الجد
+  final String greatGrandfatherName; // اسم جد الأب
+  final String familyName; // اسم العائلة
+
+  // المعلومات الشخصية
+  final int orphanIdNumber; // رقم الهوية
+  final DateTime dateOfBirth;
+  final String gender; // ذكر، أنثى
+  final String orphanType; // يتيم الأب، يتيم الأم، يتيم كلا الوالدين
+  final String? healthStatus;
+  final String? orphanPhotoUrl;
+
+  // === بيانات الأب ===
+  final String? fatherFullName; // رباعي
+  final int? fatherIdNumber;
+  final String? fatherIdPhotoUrl;
+  final int? fatherAge;
+
+  // === بيانات الأم ===
+  final String? motherFullName; // رباعي
   final int? motherIdNumber;
-  final String? motherName;
+  final String? motherIdPhotoUrl;
+  final int? motherAge;
+
+  // === بيانات المتوفي ===
+  final String? deceasedFullName; // رباعي
+  final int? deceasedIdNumber;
+  final String? deceasedPhotoUrl;
+  final String? causeOfDeath; // استشهاد، مرض، حادث، أخرى
+  final DateTime? dateOfDeath;
+  final String? deathCertificateUrl;
+
+  // === بيانات المعيل ===
+  final String? breadwinnerFullName; // رباعي
   final int? breadwinnerIdNumber;
-  final String? breadwinnerName;
-  final String? breadwinnerMaritalStatus;
-  final String? breadwinnerKinship;
-  final String? governorate;
-  final String? city;
-  final String? neighborhood;
+  final String? breadwinnerIdPhotoUrl;
+  final String? breadwinnerKinship; // العلاقة مع اليتيم
+  final String? breadwinnerMaritalStatus; // الحالة الاجتماعية
+  final int? breadwinnerAge;
+
+  // === بيانات العائلة ===
   final int numberOfMales;
   final int numberOfFemales;
   final int totalFamilyMembers;
   final int? mobileNumber;
-  final int? phoneNumber;
-  final int orphanNo;
+  final int? alternativeMobileNumber;
+  final int? whatsappNumber;
+
+  // === التعليم والصحة ===
   final String? schoolName;
-  final String? grade;
-  final String? educationLevel;
-  final String? idCardUrl;
-  final String? deathCertificateUrl;
-  final String? orphanPhotoUrl;
-  final DateTime? createdAt;
-  final DateTime? updatedAt;
-  final bool isArchived;
-  final DateTime? archivedAt;
-  final String? sponsorshipStatus;
-  final double? sponsorshipAmount;
-  final String? notes;
-  final String? healthStatus;
+  final String? grade; // الصف الدراسي
+  final String? educationLevel; // المستوى التعليمي
+  final String? educationStatus; // الحالة الدراسية
+  final String? healthCondition;
 
-  Orphan({
-    required this.institutionId,
-    this.id,
-    required this.name,
-    required this.deceasedName,
-    this.causeOfDeath,
-    this.dateOfDeath,
-    this.deceasedIdNumber,
-    this.gender,
-    required this.orphanIdNumber, // مطلوب عند الإنشاء
-    this.dateOfBirth,
-    this.motherIdNumber,
-    this.motherName,
-    this.breadwinnerIdNumber,
-    this.breadwinnerName,
-    this.breadwinnerMaritalStatus,
-    this.breadwinnerKinship,
-    this.governorate,
-    this.city,
-    this.neighborhood,
-    this.numberOfMales = 0,
-    this.numberOfFemales = 0,
-    this.totalFamilyMembers = 0,
-    this.mobileNumber,
-    this.phoneNumber,
-    required this.orphanNo,
-    this.schoolName,
-    this.grade,
-    this.educationLevel,
-    this.idCardUrl,
-    this.deathCertificateUrl,
-    this.orphanPhotoUrl,
-    this.createdAt,
-    this.updatedAt,
-    this.isArchived = false,
-    this.archivedAt,
-    this.sponsorshipStatus,
-    this.sponsorshipAmount,
-    this.notes,
-        this.healthStatus,
-
-  });
-
-  Map<String, dynamic> toMap() {
-    return {
-      'institutionId': institutionId,
-      'name': name,
-      'deceasedName': deceasedName,
-      'causeOfDeath': causeOfDeath,
-      'dateOfDeath': dateOfDeath,
-      'deceasedIdNumber': deceasedIdNumber,
-      'gender': gender,
-      'orphanIdNumber': orphanIdNumber,
-      'dateOfBirth': dateOfBirth,
-      'motherIdNumber': motherIdNumber,
-      'motherName': motherName,
-      'breadwinnerIdNumber': breadwinnerIdNumber,
-      'breadwinnerName': breadwinnerName,
-      'breadwinnerMaritalStatus': breadwinnerMaritalStatus,
-      'breadwinnerKinship': breadwinnerKinship,
-      'governorate': governorate,
-      'city': city,
-      'neighborhood': neighborhood,
-      'numberOfMales': numberOfMales,
-      'numberOfFemales': numberOfFemales,
-      'totalFamilyMembers': totalFamilyMembers,
-      'mobileNumber': mobileNumber,
-      'phoneNumber': phoneNumber,
-      'orphanNo': orphanNo,
-      'schoolName': schoolName,
-      'grade': grade,
-      'educationLevel': educationLevel,
-      'idCardUrl': idCardUrl,
-      'deathCertificateUrl': deathCertificateUrl,
-      'orphanPhotoUrl': orphanPhotoUrl,
-      'createdAt': createdAt,
-      'updatedAt': updatedAt,
-      'isArchived': isArchived,
-      'archivedAt': archivedAt,
-      'sponsorshipStatus': sponsorshipStatus,
-      'sponsorshipAmount': sponsorshipAmount,
-      'notes': notes,
-            'healthStatus': healthStatus,
-
-    };
-  }
-
-  static Orphan fromMap(Map<String, dynamic> map, {String? id}) {
-    int? parseInt(dynamic value) {
-      if (value == null) return null;
-      if (value is int) return value;
-      return int.tryParse(value.toString());
-    }
-
-    return Orphan(
-      institutionId: map['institutionId'] as String,
-      id: id,
-      name: map['name'] as String? ?? '',
-      deceasedName: map['deceasedName'] as String? ?? '',
-      causeOfDeath: map['causeOfDeath'] as String?,
-      dateOfDeath: (map['dateOfDeath'] as Timestamp?)?.toDate(),
-      deceasedIdNumber: parseInt(map['deceasedIdNumber']),
-      gender: map['gender'] as String?,
-      orphanIdNumber: parseInt(map['orphanIdNumber']) ?? 0,
-      dateOfBirth: (map['dateOfBirth'] as Timestamp?)?.toDate(),
-      motherIdNumber: parseInt(map['motherIdNumber']),
-      motherName: map['motherName'] as String?,
-      breadwinnerIdNumber: parseInt(map['breadwinnerIdNumber']),
-      breadwinnerName: map['breadwinnerName'] as String?,
-      breadwinnerMaritalStatus: map['breadwinnerMaritalStatus'] as String?,
-      breadwinnerKinship: map['breadwinnerKinship'] as String?,
-      governorate: map['governorate'] as String?,
-      city: map['city'] as String?,
-      neighborhood: map['neighborhood'] as String?,
-      numberOfMales: map['numberOfMales'] as int? ?? 0,
-      numberOfFemales: map['numberOfFemales'] as int? ?? 0,
-      totalFamilyMembers: map['totalFamilyMembers'] as int? ?? 0,
-      mobileNumber: parseInt(map['mobileNumber']),
-      phoneNumber: parseInt(map['phoneNumber']),
-      orphanNo: parseInt(map['orphanNo']) ?? 0,
-      schoolName: map['schoolName'] as String?,
-      grade: map['grade'] as String?,
-      educationLevel: map['educationLevel'] as String?,
-      idCardUrl: map['idCardUrl'] as String?,
-      deathCertificateUrl: map['deathCertificateUrl'] as String?,
-      orphanPhotoUrl: map['orphanPhotoUrl'] as String?,
-      createdAt: (map['createdAt'] as Timestamp?)?.toDate(),
-      updatedAt: (map['updatedAt'] as Timestamp?)?.toDate(),
-      isArchived: map['isArchived'] as bool? ?? false,
-      archivedAt: (map['archivedAt'] as Timestamp?)?.toDate(),
-      sponsorshipStatus: map['sponsorshipStatus'] as String?,
-      sponsorshipAmount: (map['sponsorshipAmount'] as num?)?.toDouble(),
-      notes: map['notes'] as String?,
-            healthStatus: map['healthStatus'] as String?,
-
-    );
-  }
-
-  Orphan copyWith({
-    String? id,
-    String? institutionId,
-    String? name,
-    String? deceasedName,
-    String? causeOfDeath,
-    DateTime? dateOfDeath,
-    int? deceasedIdNumber,
-    String? gender,
-    int? orphanIdNumber,
-    DateTime? dateOfBirth,
-    int? motherIdNumber,
-    String? motherName,
-    int? breadwinnerIdNumber,
-    String? breadwinnerName,
-    String? breadwinnerMaritalStatus,
-    String? breadwinnerKinship,
-    String? governorate,
-    String? city,
-    String? neighborhood,
-    int? numberOfMales,
-    int? numberOfFemales,
-    int? totalFamilyMembers,
-    int? mobileNumber,
-    int? phoneNumber,
-    int? orphanNo,
-    String? schoolName,
-    String? grade,
-    String? healthStatus,
-    String? educationLevel,
-    String? idCardUrl,
-    String? deathCertificateUrl,
-    String? orphanPhotoUrl,
-    DateTime? createdAt,
-    DateTime? updatedAt,
-    bool? isArchived,
-    DateTime? archivedAt,
-    String? sponsorshipStatus,
-    double? sponsorshipAmount,
-    String? notes,
-  }) {
-    return Orphan(
-      id: id ?? this.id,
-      institutionId: institutionId ?? this.institutionId,
-      name: name ?? this.name,
-      deceasedName: deceasedName ?? this.deceasedName,
-      causeOfDeath: causeOfDeath ?? this.causeOfDeath,
-      dateOfDeath: dateOfDeath ?? this.dateOfDeath,
-      deceasedIdNumber: deceasedIdNumber ?? this.deceasedIdNumber,
-      gender: gender ?? this.gender,
-      orphanIdNumber: orphanIdNumber ?? this.orphanIdNumber,
-      dateOfBirth: dateOfBirth ?? this.dateOfBirth,
-      motherIdNumber: motherIdNumber ?? this.motherIdNumber,
-      motherName: motherName ?? this.motherName,
-      breadwinnerIdNumber: breadwinnerIdNumber ?? this.breadwinnerIdNumber,
-      breadwinnerName: breadwinnerName ?? this.breadwinnerName,
-      breadwinnerMaritalStatus:
-          breadwinnerMaritalStatus ?? this.breadwinnerMaritalStatus,
-      breadwinnerKinship: breadwinnerKinship ?? this.breadwinnerKinship,
-      governorate: governorate ?? this.governorate,
-      city: city ?? this.city,
-      neighborhood: neighborhood ?? this.neighborhood,
-      numberOfMales: numberOfMales ?? this.numberOfMales,
-      numberOfFemales: numberOfFemales ?? this.numberOfFemales,
-      totalFamilyMembers: totalFamilyMembers ?? this.totalFamilyMembers,
-      mobileNumber: mobileNumber ?? this.mobileNumber,
-      phoneNumber: phoneNumber ?? this.phoneNumber,
-      orphanNo: orphanNo ?? this.orphanNo,
-      schoolName: schoolName ?? this.schoolName,
-      grade: grade ?? this.grade,
-      educationLevel: educationLevel ?? this.educationLevel,
-      idCardUrl: idCardUrl ?? this.idCardUrl,
-      deathCertificateUrl: deathCertificateUrl ?? this.deathCertificateUrl,
-      orphanPhotoUrl: orphanPhotoUrl ?? this.orphanPhotoUrl,
-      createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt ?? this.updatedAt,
-      isArchived: isArchived ?? this.isArchived,
-      archivedAt: archivedAt ?? this.archivedAt,
-      sponsorshipStatus: sponsorshipStatus ?? this.sponsorshipStatus,
-      sponsorshipAmount: sponsorshipAmount ?? this.sponsorshipAmount,
-      notes: notes ?? this.notes,
-            healthStatus: healthStatus ?? this.healthStatus,
-
-    );
-  }
-}
-*/
-
-import 'package:cloud_firestore/cloud_firestore.dart';
-
-class Orphan {
-  final String institutionId;
-  final String? id;
-  final String name;
-  final String deceasedName;
-  final String? causeOfDeath;
-  final DateTime? dateOfDeath;
-  final int? deceasedIdNumber;
-  final String? gender;
-  final int? orphanIdNumber;
-  final DateTime? dateOfBirth;
-  final int? motherIdNumber;
-  final String? motherName;
-  final int? breadwinnerIdNumber;
-  final String? breadwinnerName;
-  final String? breadwinnerMaritalStatus;
-  final String? breadwinnerKinship;
+  // === السكن والوضع المادي ===
   final String? governorate;
   final String? city;
   final String? neighborhood;
-  final int numberOfMales;
-  final int numberOfFemales;
-  final int totalFamilyMembers;
-  final int? mobileNumber;
-  final int? phoneNumber;
-  final int? orphanNo;
-  final String? schoolName;
-  final String? grade;
-  final String? educationLevel;
-  final String? idCardUrl;
-  final String? deathCertificateUrl;
-  final String? orphanPhotoUrl;
-  final DateTime? createdAt;
-  final DateTime? updatedAt;
+  final String? landmark;
+  final String? housingCondition; // حالة السكن
+  final String? housingOwnership; // ملكية السكن
+  final String? monthlyIncome; // الدخل الشهري
+  final String? incomeSources; // مصادر الدخل
+
+  // === المستندات ===
+  final String? birthCertificateUrl;
+  final String? otherDocumentsUrl;
+
+  // === الكفالة (يتم إدخالها لاحقاً) ===
+  final String? sponsorshipStatus; // مكفول، غير مكفول
+  final double? sponsorshipAmount;
+  final String? sponsorshipType; // مالية، طرود غذائية، صحية، دراسية
+  final DateTime? sponsorshipDate;
+
+  // === ملاحظات ===
+  final String? notes;
+
+  // الحقول التلقائية
+  final DateTime createdAt;
+  final DateTime updatedAt;
   final bool isArchived;
   final DateTime? archivedAt;
-  final String? sponsorshipStatus;
-  final double? sponsorshipAmount;
-  final String? notes;
-  final String? healthStatus;
 
   Orphan({
-    required this.institutionId,
     this.id,
-    required this.name,
-    required this.deceasedName,
-    this.causeOfDeath,
-    this.dateOfDeath,
-    this.deceasedIdNumber,
-    this.gender,
-    this.orphanIdNumber,
-    this.dateOfBirth,
-    this.motherIdNumber,
-    this.motherName,
-    this.breadwinnerIdNumber,
-    this.breadwinnerName,
-    this.breadwinnerMaritalStatus,
-    this.breadwinnerKinship,
-    this.governorate,
-    this.city,
-    this.neighborhood,
-    this.numberOfMales = 0,
-    this.numberOfFemales = 0,
-    this.totalFamilyMembers = 0,
-    this.mobileNumber,
-    this.phoneNumber,
+    required this.institutionId,
+    required this.kafalaHeadId,
     required this.orphanNo,
-    this.schoolName,
-    this.grade,
-    this.educationLevel,
-    this.idCardUrl,
-    this.deathCertificateUrl,
-    this.orphanPhotoUrl,
-    this.createdAt,
-    this.updatedAt,
-    this.isArchived = false,
-    this.archivedAt,
-    this.sponsorshipStatus,
-    this.sponsorshipAmount,
-    this.notes,
+
+    // الإسم الخماسي
+    required this.orphanName,
+    required this.fatherName,
+    required this.grandfatherName,
+    required this.greatGrandfatherName,
+    required this.familyName,
+
+    // المعلومات الشخصية
+    required this.orphanIdNumber,
+    required this.dateOfBirth,
+    required this.gender,
+    required this.orphanType,
     this.healthStatus,
+    this.orphanPhotoUrl,
+
+    // بيانات الأب
+    this.fatherFullName,
+    this.fatherIdNumber,
+    this.fatherIdPhotoUrl,
+    this.fatherAge,
+
+    // بيانات الأم
+    this.motherFullName,
+    this.motherIdNumber,
+    this.motherIdPhotoUrl,
+    this.motherAge,
+
+    // بيانات المتوفي
+    this.deceasedFullName,
+    this.deceasedIdNumber,
+    this.deceasedPhotoUrl,
+    this.causeOfDeath,
+    this.dateOfDeath,
+    this.deathCertificateUrl,
+
+    // بيانات المعيل
+    this.breadwinnerFullName,
+    this.breadwinnerIdNumber,
+    this.breadwinnerIdPhotoUrl,
+    this.breadwinnerKinship,
+    this.breadwinnerMaritalStatus,
+    this.breadwinnerAge,
+
+    // بيانات العائلة
+    this.numberOfMales = 0,
+    this.numberOfFemales = 0,
+    this.totalFamilyMembers = 0,
+    this.mobileNumber,
+    this.alternativeMobileNumber,
+    this.whatsappNumber,
+
+    // التعليم والصحة
+    this.schoolName,
+    this.grade,
+    this.educationLevel,
+    this.educationStatus,
+    this.healthCondition,
+
+    // السكن والوضع المادي
+    this.governorate,
+    this.city,
+    this.neighborhood,
+    this.landmark,
+    this.housingCondition,
+    this.housingOwnership,
+    this.monthlyIncome,
+    this.incomeSources,
+
+    // المستندات
+    this.birthCertificateUrl,
+    this.otherDocumentsUrl,
+
+    // الكفالة
+    this.sponsorshipStatus,
+    this.sponsorshipAmount,
+    this.sponsorshipType,
+    this.sponsorshipDate,
+
+    // ملاحظات
+    this.notes,
+
+    // الحقول التلقائية
+    required this.createdAt,
+    required this.updatedAt,
+    this.isArchived = false,
+    this.archivedAt,
   });
+
+  // الإسم الكامل
+  String get orphanFullName =>
+      '$orphanName $fatherName $grandfatherName  $familyName'.trim();
+
+  // ===== Helpers آمنة للتحويل =====
+  static String? _asString(dynamic v) {
+    if (v == null) return null;
+    return v.toString();
+  }
+
+  static int? _asInt(dynamic v) {
+    if (v == null) return null;
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    if (v is String) return int.tryParse(v.trim());
+    return null;
+  }
+
+  static double? _asDouble(dynamic v) {
+    if (v == null) return null;
+    if (v is double) return v;
+    if (v is num) return v.toDouble();
+    if (v is String) return double.tryParse(v.trim());
+    return null;
+  }
+
+  static bool _asBool(dynamic v, {bool defaultValue = false}) {
+    if (v == null) return defaultValue;
+    if (v is bool) return v;
+    if (v is num) return v != 0;
+    if (v is String) {
+      final s = v.trim().toLowerCase();
+      if (s == 'true' || s == '1' || s == 'yes') return true;
+      if (s == 'false' || s == '0' || s == 'no') return false;
+    }
+    return defaultValue;
+  }
+
+  static DateTime? _asDate(dynamic v) {
+    if (v == null) return null;
+    if (v is DateTime) return v;
+    if (v is Timestamp) return v.toDate();
+    if (v is int) {
+      // seconds or millis
+      if (v > 1000000000000) return DateTime.fromMillisecondsSinceEpoch(v);
+      return DateTime.fromMillisecondsSinceEpoch(v * 1000);
+    }
+    if (v is String) {
+      // جرّب ISO أولاً
+      try {
+        return DateTime.parse(v);
+      } catch (_) {
+        // جرّب dd/MM/yyyy
+        try {
+          final parts = v.split('/');
+          if (parts.length == 3) {
+            final d = int.tryParse(parts[0]);
+            final m = int.tryParse(parts[1]);
+            final y = int.tryParse(parts[2]);
+            if (d != null && m != null && y != null) {
+              return DateTime(y, m, d);
+            }
+          }
+        } catch (_) {}
+      }
+    }
+    return null;
+  }
 
   Map<String, dynamic> toMap() {
     return {
       'institutionId': institutionId,
-      'name': name,
-      'deceasedName': deceasedName,
-      'causeOfDeath': causeOfDeath,
-      'dateOfDeath': dateOfDeath,
-      'deceasedIdNumber': deceasedIdNumber,
-      'gender': gender,
+      'kafalaHeadId': kafalaHeadId,
+      'orphanNo': orphanNo,
+
+      // الإسم الخماسي
+      'orphanName': orphanName,
+      'fatherName': fatherName,
+      'grandfatherName': grandfatherName,
+      'greatGrandfatherName': greatGrandfatherName,
+      'familyName': familyName,
+      'fullName': orphanFullName,
+
+      // المعلومات الشخصية
       'orphanIdNumber': orphanIdNumber,
-      'dateOfBirth': dateOfBirth,
+      'dateOfBirth': Timestamp.fromDate(dateOfBirth),
+      'gender': gender,
+      'orphanType': orphanType,
+      'healthStatus': healthStatus,
+      'orphanPhotoUrl': orphanPhotoUrl,
+
+      // بيانات الأب
+      'fatherFullName': fatherFullName,
+      'fatherIdNumber': fatherIdNumber,
+      'fatherIdPhotoUrl': fatherIdPhotoUrl,
+      'fatherAge': fatherAge,
+
+      // بيانات الأم
+      'motherFullName': motherFullName,
       'motherIdNumber': motherIdNumber,
-      'motherName': motherName,
+      'motherIdPhotoUrl': motherIdPhotoUrl,
+      'motherAge': motherAge,
+
+      // بيانات المتوفي
+      'deceasedFullName': deceasedFullName,
+      'deceasedIdNumber': deceasedIdNumber,
+      'deceasedPhotoUrl': deceasedPhotoUrl,
+      'causeOfDeath': causeOfDeath,
+      'dateOfDeath': dateOfDeath != null ? Timestamp.fromDate(dateOfDeath!) : null,
+      'deathCertificateUrl': deathCertificateUrl,
+
+      // بيانات المعيل
+      'breadwinnerFullName': breadwinnerFullName,
       'breadwinnerIdNumber': breadwinnerIdNumber,
-      'breadwinnerName': breadwinnerName,
-      'breadwinnerMaritalStatus': breadwinnerMaritalStatus,
+      'breadwinnerIdPhotoUrl': breadwinnerIdPhotoUrl,
       'breadwinnerKinship': breadwinnerKinship,
-      'governorate': governorate,
-      'city': city,
-      'neighborhood': neighborhood,
+      'breadwinnerMaritalStatus': breadwinnerMaritalStatus,
+      'breadwinnerAge': breadwinnerAge,
+
+      // بيانات العائلة
       'numberOfMales': numberOfMales,
       'numberOfFemales': numberOfFemales,
       'totalFamilyMembers': totalFamilyMembers,
       'mobileNumber': mobileNumber,
-      'phoneNumber': phoneNumber,
-      'orphanNo': orphanNo,
+      'alternativeMobileNumber': alternativeMobileNumber,
+      'whatsappNumber': whatsappNumber,
+
+      // التعليم والصحة
       'schoolName': schoolName,
       'grade': grade,
       'educationLevel': educationLevel,
-      'idCardUrl': idCardUrl,
-      'deathCertificateUrl': deathCertificateUrl,
-      'orphanPhotoUrl': orphanPhotoUrl,
-      'createdAt': createdAt,
-      'updatedAt': updatedAt,
-      'isArchived': isArchived,
-      'archivedAt': archivedAt,
+      'educationStatus': educationStatus,
+      'healthCondition': healthCondition,
+
+      // السكن والوضع المادي
+      'governorate': governorate,
+      'city': city,
+      'neighborhood': neighborhood,
+      'landmark': landmark,
+      'housingCondition': housingCondition,
+      'housingOwnership': housingOwnership,
+      'monthlyIncome': monthlyIncome,
+      'incomeSources': incomeSources,
+
+      // المستندات
+      'birthCertificateUrl': birthCertificateUrl,
+      'otherDocumentsUrl': otherDocumentsUrl,
+
+      // الكفالة
       'sponsorshipStatus': sponsorshipStatus,
       'sponsorshipAmount': sponsorshipAmount,
+      'sponsorshipType': sponsorshipType,
+      'sponsorshipDate': sponsorshipDate != null ? Timestamp.fromDate(sponsorshipDate!) : null,
+
+      // ملاحظات
       'notes': notes,
-      'healthStatus': healthStatus,
+
+      // الحقول التلقائية
+      'createdAt': Timestamp.fromDate(createdAt),
+      'updatedAt': Timestamp.fromDate(updatedAt),
+      'isArchived': isArchived,
+      'archivedAt': archivedAt != null ? Timestamp.fromDate(archivedAt!) : null,
     };
   }
 
-  static Orphan fromMap(Map<String, dynamic> map, {String? id}) {
+  factory Orphan.fromMap(Map<String, dynamic> map, {String? id}) {
     return Orphan(
-      institutionId: map['institutionId'] as String,
-      id: id,
-      name: map['name'] as String,
-      deceasedName: map['deceasedName'] as String,
-      causeOfDeath: map['causeOfDeath'] as String?,
-      dateOfDeath: (map['dateOfDeath'] as Timestamp?)?.toDate(),
-      deceasedIdNumber: map['deceasedIdNumber'] as int?,
-      gender: map['gender'] as String?,
-      orphanIdNumber: map['orphanIdNumber'] as int?,
-      dateOfBirth: (map['dateOfBirth'] as Timestamp?)?.toDate(),
-      motherIdNumber: map['motherIdNumber'] as int?,
-      motherName: map['motherName'] as String?,
-      breadwinnerIdNumber: map['breadwinnerIdNumber'] as int?,
-      breadwinnerName: map['breadwinnerName'] as String?,
-      breadwinnerMaritalStatus: map['breadwinnerMaritalStatus'] as String?,
-      breadwinnerKinship: map['breadwinnerKinship'] as String?,
-      governorate: map['governorate'] as String?,
-      city: map['city'] as String?,
-      neighborhood: map['neighborhood'] as String?,
-      numberOfMales: map['numberOfMales'] as int? ?? 0,
-      numberOfFemales: map['numberOfFemales'] as int? ?? 0,
-      totalFamilyMembers: map['totalFamilyMembers'] as int? ?? 0,
-      mobileNumber: map['mobileNumber'] as int?,
-      phoneNumber: map['phoneNumber'] as int?,
-      orphanNo: map['orphanNo'] as int,
-      schoolName: map['schoolName'] as String?,
-      grade: map['grade'] as String?,
-      educationLevel: map['educationLevel'] as String?,
-      idCardUrl: map['idCardUrl'] as String?,
-      deathCertificateUrl: map['deathCertificateUrl'] as String?,
-      orphanPhotoUrl: map['orphanPhotoUrl'] as String?,
-      createdAt: (map['createdAt'] as Timestamp?)?.toDate(),
-      updatedAt: (map['updatedAt'] as Timestamp?)?.toDate(),
-      isArchived: map['isArchived'] as bool? ?? false,
-      archivedAt: (map['archivedAt'] as Timestamp?)?.toDate(),
-      sponsorshipStatus: map['sponsorshipStatus'] as String?,
-      sponsorshipAmount: (map['sponsorshipAmount'] as num?)?.toDouble(),
-      notes: map['notes'] as String?,
-      healthStatus: map['healthStatus'] as String?,
+      id: id ?? _asString(map['id']),
+      institutionId: _asString(map['institutionId']) ?? '',
+      kafalaHeadId: _asString(map['kafalaHeadId']) ?? '',
+      orphanNo: _asInt(map['orphanNo']) ?? 0,
+
+      // الإسم الخماسي
+      orphanName: _asString(map['orphanName']) ?? _asString(map['name']) ?? '',
+      fatherName: _asString(map['fatherName']) ?? '',
+      grandfatherName: _asString(map['grandfatherName']) ?? '',
+      greatGrandfatherName: _asString(map['greatGrandfatherName']) ?? '',
+      familyName: _asString(map['familyName']) ?? '',
+
+      // المعلومات الشخصية
+      orphanIdNumber: _asInt(map['orphanIdNumber']) ?? 0,
+      dateOfBirth: _asDate(map['dateOfBirth']) ?? DateTime(2000, 1, 1),
+      gender: _asString(map['gender']) ?? '',
+      orphanType: _asString(map['orphanType']) ?? '',
+      healthStatus: _asString(map['healthStatus']),
+      orphanPhotoUrl: _asString(map['orphanPhotoUrl']),
+
+      // بيانات الأب
+      fatherFullName: _asString(map['fatherFullName']),
+      fatherIdNumber: _asInt(map['fatherIdNumber']),
+      fatherIdPhotoUrl: _asString(map['fatherIdPhotoUrl']),
+      fatherAge: _asInt(map['fatherAge']),
+
+      // بيانات الأم
+      motherFullName: _asString(map['motherFullName']),
+      motherIdNumber: _asInt(map['motherIdNumber']),
+      motherIdPhotoUrl: _asString(map['motherIdPhotoUrl']),
+      motherAge: _asInt(map['motherAge']),
+
+      // بيانات المتوفي
+      deceasedFullName: _asString(map['deceasedFullName']),
+      deceasedIdNumber: _asInt(map['deceasedIdNumber']),
+      deceasedPhotoUrl: _asString(map['deceasedPhotoUrl']),
+      causeOfDeath: _asString(map['causeOfDeath']),
+      dateOfDeath: _asDate(map['dateOfDeath']),
+      deathCertificateUrl: _asString(map['deathCertificateUrl']),
+
+      // بيانات المعيل
+      breadwinnerFullName: _asString(map['breadwinnerFullName']),
+      breadwinnerIdNumber: _asInt(map['breadwinnerIdNumber']),
+      breadwinnerIdPhotoUrl: _asString(map['breadwinnerIdPhotoUrl']),
+      breadwinnerKinship: _asString(map['breadwinnerKinship']),
+      breadwinnerMaritalStatus: _asString(map['breadwinnerMaritalStatus']),
+      breadwinnerAge: _asInt(map['breadwinnerAge']),
+
+      // بيانات العائلة
+      numberOfMales: _asInt(map['numberOfMales']) ?? 0,
+      numberOfFemales: _asInt(map['numberOfFemales']) ?? 0,
+      totalFamilyMembers: _asInt(map['totalFamilyMembers']) ?? 0,
+      mobileNumber: _asInt(map['mobileNumber']),
+      alternativeMobileNumber: _asInt(map['alternativeMobileNumber']),
+      whatsappNumber: _asInt(map['whatsappNumber']),
+
+      // التعليم والصحة
+      schoolName: _asString(map['schoolName']),
+      grade: _asString(map['grade']),
+      educationLevel: _asString(map['educationLevel']),
+      educationStatus: _asString(map['educationStatus']),
+      healthCondition: _asString(map['healthCondition']),
+
+      // السكن والوضع المادي
+      governorate: _asString(map['governorate']),
+      city: _asString(map['city']),
+      neighborhood: _asString(map['neighborhood']),
+      landmark: _asString(map['landmark']),
+      housingCondition: _asString(map['housingCondition']),
+      housingOwnership: _asString(map['housingOwnership']),
+      monthlyIncome: _asString(map['monthlyIncome']),
+      incomeSources: _asString(map['incomeSources']),
+
+      // المستندات
+      birthCertificateUrl: _asString(map['birthCertificateUrl']),
+      otherDocumentsUrl: _asString(map['otherDocumentsUrl']),
+
+      // الكفالة
+      sponsorshipStatus: _asString(map['sponsorshipStatus']),
+      sponsorshipAmount: _asDouble(map['sponsorshipAmount']),
+      sponsorshipType: _asString(map['sponsorshipType']),
+      sponsorshipDate: _asDate(map['sponsorshipDate']),
+
+      // ملاحظات
+      notes: _asString(map['notes']),
+
+      // الحقول التلقائية
+      createdAt: _asDate(map['createdAt']) ?? DateTime.now(),
+      updatedAt: _asDate(map['updatedAt']) ?? DateTime.now(),
+      isArchived: _asBool(map['isArchived'], defaultValue: false),
+      archivedAt: _asDate(map['archivedAt']),
     );
   }
 
   Orphan copyWith({
     String? id,
     String? institutionId,
-    String? name,
-    String? deceasedName,
-    String? causeOfDeath,
-    DateTime? dateOfDeath,
-    int? deceasedIdNumber,
-    String? gender,
+    String? kafalaHeadId,
+    int? orphanNo,
+    // الإسم الخماسي
+    String? orphanName,
+    String? fatherName,
+    String? grandfatherName,
+    String? greatGrandfatherName,
+    String? familyName,
+    // المعلومات الشخصية
     int? orphanIdNumber,
     DateTime? dateOfBirth,
+    String? gender,
+    String? orphanType,
+    String? healthStatus,
+    String? orphanPhotoUrl,
+    // بيانات الأب
+    String? fatherFullName,
+    int? fatherIdNumber,
+    String? fatherIdPhotoUrl,
+    int? fatherAge,
+    // بيانات الأم
+    String? motherFullName,
     int? motherIdNumber,
-    String? motherName,
+    String? motherIdPhotoUrl,
+    int? motherAge,
+    // بيانات المتوفي
+    String? deceasedFullName,
+    int? deceasedIdNumber,
+    String? deceasedPhotoUrl,
+    String? causeOfDeath,
+    DateTime? dateOfDeath,
+    String? deathCertificateUrl,
+    // بيانات المعيل
+    String? breadwinnerFullName,
     int? breadwinnerIdNumber,
-    String? breadwinnerName,
-    String? breadwinnerMaritalStatus,
+    String? breadwinnerIdPhotoUrl,
     String? breadwinnerKinship,
-    String? governorate,
-    String? city,
-    String? neighborhood,
+    String? breadwinnerMaritalStatus,
+    int? breadwinnerAge,
+    // بيانات العائلة
     int? numberOfMales,
     int? numberOfFemales,
     int? totalFamilyMembers,
     int? mobileNumber,
-    int? phoneNumber,
-    int? orphanNo,
+    int? alternativeMobileNumber,
+    int? whatsappNumber,
+    // التعليم والصحة
     String? schoolName,
     String? grade,
     String? educationLevel,
-    String? idCardUrl,
-    String? deathCertificateUrl,
-    String? orphanPhotoUrl,
+    String? educationStatus,
+    String? healthCondition,
+    // السكن والوضع المادي
+    String? governorate,
+    String? city,
+    String? neighborhood,
+    String? landmark,
+    String? housingCondition,
+    String? housingOwnership,
+    String? monthlyIncome,
+    String? incomeSources,
+    // المستندات
+    String? birthCertificateUrl,
+    String? otherDocumentsUrl,
+    // الكفالة
+    String? sponsorshipStatus,
+    double? sponsorshipAmount,
+    String? sponsorshipType,
+    DateTime? sponsorshipDate,
+    // ملاحظات
+    String? notes,
+    // الحقول التلقائية
     DateTime? createdAt,
     DateTime? updatedAt,
     bool? isArchived,
     DateTime? archivedAt,
-    String? sponsorshipStatus,
-    double? sponsorshipAmount,
-    String? notes,
-    String? healthStatus,
   }) {
     return Orphan(
       id: id ?? this.id,
       institutionId: institutionId ?? this.institutionId,
-      name: name ?? this.name,
-      deceasedName: deceasedName ?? this.deceasedName,
-      causeOfDeath: causeOfDeath ?? this.causeOfDeath,
-      dateOfDeath: dateOfDeath ?? this.dateOfDeath,
-      deceasedIdNumber: deceasedIdNumber ?? this.deceasedIdNumber,
-      gender: gender ?? this.gender,
+      kafalaHeadId: kafalaHeadId ?? this.kafalaHeadId,
+      orphanNo: orphanNo ?? this.orphanNo,
+      // الإسم الخماسي
+      orphanName: orphanName ?? this.orphanName,
+      fatherName: fatherName ?? this.fatherName,
+      grandfatherName: grandfatherName ?? this.grandfatherName,
+      greatGrandfatherName: greatGrandfatherName ?? this.greatGrandfatherName,
+      familyName: familyName ?? this.familyName,
+      // المعلومات الشخصية
       orphanIdNumber: orphanIdNumber ?? this.orphanIdNumber,
       dateOfBirth: dateOfBirth ?? this.dateOfBirth,
+      gender: gender ?? this.gender,
+      orphanType: orphanType ?? this.orphanType,
+      healthStatus: healthStatus ?? this.healthStatus,
+      orphanPhotoUrl: orphanPhotoUrl ?? this.orphanPhotoUrl,
+      // بيانات الأب
+      fatherFullName: fatherFullName ?? this.fatherFullName,
+      fatherIdNumber: fatherIdNumber ?? this.fatherIdNumber,
+      fatherIdPhotoUrl: fatherIdPhotoUrl ?? this.fatherIdPhotoUrl,
+      fatherAge: fatherAge ?? this.fatherAge,
+      // بيانات الأم
+      motherFullName: motherFullName ?? this.motherFullName,
       motherIdNumber: motherIdNumber ?? this.motherIdNumber,
-      motherName: motherName ?? this.motherName,
+      motherIdPhotoUrl: motherIdPhotoUrl ?? this.motherIdPhotoUrl,
+      motherAge: motherAge ?? this.motherAge,
+      // بيانات المتوفي
+      deceasedFullName: deceasedFullName ?? this.deceasedFullName,
+      deceasedIdNumber: deceasedIdNumber ?? this.deceasedIdNumber,
+      deceasedPhotoUrl: deceasedPhotoUrl ?? this.deceasedPhotoUrl,
+      causeOfDeath: causeOfDeath ?? this.causeOfDeath,
+      dateOfDeath: dateOfDeath ?? this.dateOfDeath,
+      deathCertificateUrl: deathCertificateUrl ?? this.deathCertificateUrl,
+      // بيانات المعيل
+      breadwinnerFullName: breadwinnerFullName ?? this.breadwinnerFullName,
       breadwinnerIdNumber: breadwinnerIdNumber ?? this.breadwinnerIdNumber,
-      breadwinnerName: breadwinnerName ?? this.breadwinnerName,
+      breadwinnerIdPhotoUrl: breadwinnerIdPhotoUrl ?? this.breadwinnerIdPhotoUrl,
+      breadwinnerKinship: breadwinnerKinship ?? this.breadwinnerKinship,
       breadwinnerMaritalStatus:
           breadwinnerMaritalStatus ?? this.breadwinnerMaritalStatus,
-      breadwinnerKinship: breadwinnerKinship ?? this.breadwinnerKinship,
-      governorate: governorate ?? this.governorate,
-      city: city ?? this.city,
-      neighborhood: neighborhood ?? this.neighborhood,
+      breadwinnerAge: breadwinnerAge ?? this.breadwinnerAge,
+      // بيانات العائلة
       numberOfMales: numberOfMales ?? this.numberOfMales,
       numberOfFemales: numberOfFemales ?? this.numberOfFemales,
       totalFamilyMembers: totalFamilyMembers ?? this.totalFamilyMembers,
       mobileNumber: mobileNumber ?? this.mobileNumber,
-      phoneNumber: phoneNumber ?? this.phoneNumber,
-      orphanNo: orphanNo ?? this.orphanNo,
+      alternativeMobileNumber:
+          alternativeMobileNumber ?? this.alternativeMobileNumber,
+      whatsappNumber: whatsappNumber ?? this.whatsappNumber,
+      // التعليم والصحة
       schoolName: schoolName ?? this.schoolName,
       grade: grade ?? this.grade,
       educationLevel: educationLevel ?? this.educationLevel,
-      idCardUrl: idCardUrl ?? this.idCardUrl,
-      deathCertificateUrl: deathCertificateUrl ?? this.deathCertificateUrl,
-      orphanPhotoUrl: orphanPhotoUrl ?? this.orphanPhotoUrl,
+      educationStatus: educationStatus ?? this.educationStatus,
+      healthCondition: healthCondition ?? this.healthCondition,
+      // السكن والوضع المادي
+      governorate: governorate ?? this.governorate,
+      city: city ?? this.city,
+      neighborhood: neighborhood ?? this.neighborhood,
+      landmark: landmark ?? this.landmark,
+      housingCondition: housingCondition ?? this.housingCondition,
+      housingOwnership: housingOwnership ?? this.housingOwnership,
+      monthlyIncome: monthlyIncome ?? this.monthlyIncome,
+      incomeSources: incomeSources ?? this.incomeSources,
+      // المستندات
+      birthCertificateUrl: birthCertificateUrl ?? this.birthCertificateUrl,
+      otherDocumentsUrl: otherDocumentsUrl ?? this.otherDocumentsUrl,
+      // الكفالة
+      sponsorshipStatus: sponsorshipStatus ?? this.sponsorshipStatus,
+      sponsorshipAmount: sponsorshipAmount ?? this.sponsorshipAmount,
+      sponsorshipType: sponsorshipType ?? this.sponsorshipType,
+      sponsorshipDate: sponsorshipDate ?? this.sponsorshipDate,
+      // ملاحظات
+      notes: notes ?? this.notes,
+      // الحقول التلقائية
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       isArchived: isArchived ?? this.isArchived,
       archivedAt: archivedAt ?? this.archivedAt,
-      sponsorshipStatus: sponsorshipStatus ?? this.sponsorshipStatus,
-      sponsorshipAmount: sponsorshipAmount ?? this.sponsorshipAmount,
-      notes: notes ?? this.notes,
-      healthStatus: healthStatus ?? this.healthStatus,
     );
   }
 }

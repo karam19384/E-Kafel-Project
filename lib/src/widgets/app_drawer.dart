@@ -1,265 +1,223 @@
+import 'package:e_kafel/src/screens/supervisors/supervisors_screen.dart';
 import 'package:flutter/material.dart';
-import 'package:e_kafel/src/screens/profile_screen.dart';
-import 'package:e_kafel/src/screens/orphans_list_screen.dart';
-import 'package:e_kafel/src/screens/add_new_orphan_screen.dart';
-import 'package:e_kafel/src/screens/sponsorship_management_screen.dart';
-import 'package:e_kafel/src/screens/reports_screen.dart';
-import 'package:e_kafel/src/screens/settings_screen.dart';
-import 'package:e_kafel/src/screens/tasks_screen.dart';
-import 'package:e_kafel/src/screens/field_visits_screen.dart';
-import 'package:e_kafel/src/screens/send_sms_screen.dart';
-import '../screens/home_screen.dart';
+import 'package:e_kafel/src/screens/profile/profile_screen.dart';
+import 'package:e_kafel/src/screens/orphans/orphans_list_screen.dart';
+import 'package:e_kafel/src/screens/orphans/add_new_orphan_screen.dart';
+import 'package:e_kafel/src/screens/sponsorship/sponsorship_management_screen.dart';
+import 'package:e_kafel/src/screens/reports/reports_screen.dart';
+import 'package:e_kafel/src/screens/settings/settings_screen.dart';
+import 'package:e_kafel/src/screens/tasks/tasks_screen.dart';
+import 'package:e_kafel/src/screens/visits/field_visits_screen.dart';
+import 'package:e_kafel/src/screens/sms/send_sms_screen.dart';
+import '../screens/Home/home_screen.dart';
 
+// في app_drawer.dart - النسخة النهائية
 class AppDrawer extends StatelessWidget {
   final String userName;
   final String userRole;
-  final String? profileImageUrl;
+  final String profileImageUrl;
   final int orphanCount;
   final int taskCount;
   final int visitCount;
   final VoidCallback onLogout;
+  final String institutionId;
+  final String kafalaHeadId;
 
   const AppDrawer({
     super.key,
     required this.userName,
     required this.userRole,
-    this.profileImageUrl,
+    required this.profileImageUrl,
     required this.orphanCount,
     required this.taskCount,
     required this.visitCount,
     required this.onLogout,
+    required this.institutionId,
+    required this.kafalaHeadId,
   });
 
   @override
   Widget build(BuildContext context) {
     return Drawer(
-      backgroundColor: Colors.white,
       child: ListView(
         padding: EdgeInsets.zero,
-        children: <Widget>[
-          _buildDrawerHeader(),
-          const Divider(height: 1, thickness: 1, color: Color(0xFFE0E0E0)),
-          _buildDrawerItem(
-            icon: Icons.person_outline,
-            text: 'My Profile',
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const ProfileScreen()),
-              );
-            },
-          ),
-          const Divider(height: 1, thickness: 1, color: Color(0xFFE0E0E0)),
-          _buildDrawerItem(
-            icon: Icons.home,
-            text: 'Home',
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const HomeScreen()),
-              );
-            },
-          ),
-          _buildDrawerItem(
-            icon: Icons.groups,
-            text: 'Sponsorship Managment',
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const SponsorshipManagementScreen(),
-                ),
-              );
-            },
-          ),
-          _buildDrawerItem(
-            icon: Icons.sms,
-            text: 'Send SMS',
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const SendSMSScreen()),
-              );
-            },
-          ),
-          _buildDrawerItem(
-            icon: Icons.list_alt,
-            text: 'Orphans List',
-            trailingWidget: _buildBadge(orphanCount),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const OrphansListScreen(),
-                ),
-              );
-            },
-          ),
-          _buildDrawerItem(
-            icon: Icons.person_add_alt_1,
-            text: 'Add new Orphan',
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => AddNewOrphanScreen(institutionId: ''),
-                ),
-              );
-            },
-          ),
-          _buildDrawerItem(
-            icon: Icons.person_add_alt_1,
-            text: 'Add new Supervisor',
-            onTap: () {}, // أضف التنقل لاحقًا
-          ),
-          _buildDrawerItem(
-            icon: Icons.assignment,
-            text: 'Tasks',
-            trailingWidget: _buildBadge(taskCount),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const TasksScreen()),
-              );
-            },
-          ),
-          _buildDrawerItem(
-            icon: Icons.map,
-            text: 'Field Visits',
-            trailingWidget: _buildBadge(visitCount),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const FieldVisitsScreen(),
-                ),
-              );
-            },
-          ),
-          _buildDrawerItem(
-            icon: Icons.menu_book,
-            text: 'Reports',
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const ReportsScreen()),
-              );
-            },
-          ),
-          _buildDrawerItem(
-            icon: Icons.settings,
-            text: 'Settings',
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const SettingsScreen()),
-              );
-            },
-          ),
-          const Divider(height: 1, thickness: 1, color: Color(0xFFE0E0E0)),
-          _buildDrawerItem(
-            icon: Icons.logout,
-            text: 'Logout',
-            onTap: () {
-              Navigator.pop(context);
-              onLogout();
-            },
-            textColor: Colors.red,
-            iconColor: Colors.red,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDrawerHeader() {
-    return Container(
-      color: const Color(0xBFD0DFDF),
-      padding: const EdgeInsets.only(top: 32, bottom: 16),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Container(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: Color(0xFFF8BBD0), width: 4),
+          UserAccountsDrawerHeader(
+            accountName: Text(userName),
+            accountEmail: Text(
+              userRole == 'kafala_head' ? 'رئيس قسم الكفالة' : 'مشرف',
             ),
-            child: CircleAvatar(
-              radius: 38,
+            currentAccountPicture: CircleAvatar(
               backgroundColor: Colors.white,
-              backgroundImage:
-                  profileImageUrl != null && profileImageUrl!.isNotEmpty
-                  ? NetworkImage(profileImageUrl!)
+              backgroundImage: profileImageUrl.isNotEmpty
+                  ? NetworkImage(profileImageUrl)
                   : null,
-              child: (profileImageUrl == null || profileImageUrl!.isEmpty)
-                  ? const Icon(Icons.person, size: 54, color: Colors.black54)
+              child: profileImageUrl.isEmpty
+                  ? const Icon(Icons.person, color: Colors.grey)
                   : null,
             ),
+            decoration: const BoxDecoration(color: Color(0xFF6DAF97)),
           ),
-          const SizedBox(height: 8),
-          Text(
-            userName,
-            style: const TextStyle(
-              color: Color(0xFF4C7F7F),
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              fontFamily: 'Arial',
-            ),
+
+          ListTile(
+            leading: const Icon(Icons.account_circle, color: Color(0xFF6DAF97)),
+            title: const Text('الصفحة الشخصية'),
+            onTap: () {
+              Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const ProfileScreen()));
+            },
+          ),
+          const Divider(),
+
+          ListTile(
+            leading: const Icon(Icons.home, color: Color(0xFF6DAF97)),
+            title: const Text('الشاشة الرئيسية'),
+            onTap: () {
+              Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const HomeScreen()));
+            },
+          ),
+          // إحصائيات سريعة
+          _buildStatItem('الأيتام', orphanCount, Icons.people),
+          _buildStatItem('المهام', taskCount, Icons.task),
+          _buildStatItem('الزيارات', visitCount, Icons.assignment_turned_in),
+
+          const Divider(),
+
+          // إضافة يتيم
+          ListTile(
+            leading: const Icon(Icons.person_add, color: Color(0xFF6DAF97)),
+            title: const Text('إضافة يتيم'),
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => AddNewOrphanScreen(
+                    institutionId: institutionId,
+                    kafalaHeadId: kafalaHeadId,
+                  ),
+                ),
+              );
+            },
+          ),
+
+          // قائمة الأيتام
+          ListTile(
+            leading: const Icon(Icons.people, color: Color(0xFF6DAF97)),
+            title: const Text('قائمة الأيتام'),
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const OrphansListScreen()),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.task, color: Color(0xFF6DAF97)),
+            title: const Text('قائمة المشرفين'),
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const SupervisorsScreen(
+                    institutionId: '',
+                    kafalaHeadId: '',
+                  ),
+                ),
+              );
+            },
+          ),
+
+          // المهام
+          ListTile(
+            leading: const Icon(Icons.task, color: Color(0xFF6DAF97)),
+            title: const Text('المهام'),
+            onTap: () {
+              Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const TasksScreen()));
+            },
+          ),
+
+          // الزيارات الميدانية
+          ListTile(
+            leading: const Icon(Icons.assignment, color: Color(0xFF6DAF97)),
+            title: const Text('الزيارات الميدانية'),
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const FieldVisitsScreen()),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.task, color: Color(0xFF6DAF97)),
+            title: const Text('إدارة الكفالات'),
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const SponsorshipManagementScreen(),
+                ),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.task, color: Color(0xFF6DAF97)),
+            title: const Text('إرسال رسالة'),
+            onTap: () {
+              Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const SendSMSScreen()));
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.article, color: Color(0xFF6DAF97)),
+            title: const Text('التقارير'),
+            onTap: () {
+              Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const ReportsScreen()));
+            },
+          ),
+
+          const Divider(),
+
+          // الإعدادات
+          ListTile(
+            leading: const Icon(Icons.settings, color: Colors.grey),
+            title: const Text('الإعدادات'),
+            onTap: () {
+              Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const SettingsScreen()));
+            },
+          ),
+
+          // تسجيل الخروج
+          ListTile(
+            leading: const Icon(Icons.logout, color: Colors.red),
+            title: const Text('تسجيل الخروج'),
+            onTap: onLogout,
           ),
         ],
       ),
     );
   }
 
-  // تم حذف التكرار: تعريف واحد فقط لكل من _buildDrawerItem و _buildBadge موجود أعلاه
-
-  Widget _buildDrawerItem({
-    required IconData icon,
-    required String text,
-    required VoidCallback onTap,
-    Widget? trailingWidget,
-    Color textColor = Colors.black,
-    Color iconColor = Colors.black,
-  }) {
+  Widget _buildStatItem(String title, int count, IconData icon) {
     return ListTile(
-      leading: Icon(icon, color: iconColor),
-      title: Text(
-        text,
-        style: TextStyle(fontSize: 16, color: textColor, fontFamily: 'Arial'),
-      ),
-      trailing: trailingWidget,
-      onTap: onTap,
-      dense: true,
-      horizontalTitleGap: 0,
-      minLeadingWidth: 32,
-    );
-  }
-
-  // تم حذف التكرار: تعريف واحد فقط لدالة _buildBadge موجود أعلاه
-
-  Widget _buildBadge(int count) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE0E0E0),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        count.toString(),
-        style: const TextStyle(
-          color: Colors.black87,
-          fontSize: 13,
-          fontWeight: FontWeight.bold,
+      leading: Icon(icon, color: const Color(0xFF6DAF97)),
+      title: Text(title),
+      trailing: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: const Color(0xFF6DAF97),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Text(
+          count.toString(),
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
     );

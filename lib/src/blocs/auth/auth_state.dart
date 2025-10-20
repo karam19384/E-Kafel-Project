@@ -13,11 +13,19 @@ class AuthLoading extends AuthState {}
 
 class AuthAuthenticated extends AuthState {
   final String userRole;
+  final String userName;
+  final String? institutionId;
+  final Map<String, dynamic> userData;
 
-  const AuthAuthenticated({required this.userRole});
+  const AuthAuthenticated({
+    required this.userRole,
+    required this.userName,
+    this.institutionId,
+    required this.userData,
+  });
 
   @override
-  List<Object?> get props => [userRole];
+  List<Object?> get props => [userRole, userName, institutionId, userData];
 }
 
 class AuthUnauthenticated extends AuthState {}
@@ -30,3 +38,16 @@ class AuthErrorState extends AuthState {
   @override
   List<Object?> get props => [message];
 }
+
+// ✅ حالة جديدة لإعادة تعيين كلمة المرور
+class PasswordResetSent extends AuthState {
+  final String email;
+
+  const PasswordResetSent({required this.email});
+
+  @override
+  List<Object?> get props => [email];
+}
+
+// ✅ حالة جديدة للتسجيل الاجتماعي
+class SocialSignInLoading extends AuthState {}
