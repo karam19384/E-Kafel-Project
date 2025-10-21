@@ -19,6 +19,7 @@ import 'package:e_kafel/src/screens/tasks/tasks_screen.dart';
 import 'package:e_kafel/src/screens/visits/field_visits_screen.dart';
 import 'package:e_kafel/src/services/reports_service.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -40,45 +41,86 @@ import 'src/screens/orphans/orphan_details_screen.dart';
 import 'src/screens/reports/reports_screen.dart';
 import 'src/services/sms_service.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 
-@pragma('vm:entry-point')
-Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-}
+bool _isAppCheckInitialized = false;
 
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+Future<void> _initializeAppCheck() async {
+  if (_isAppCheckInitialized) {
+    if (kDebugMode) {
+      print('AppCheck already initialized, skipping...');
+    }
+    return;
+  }
 
   try {
+    if (kIsWeb) {
+      if (kDebugMode) {
+        print('Skipping App Check for web in development');
+      }
+    } else {
+      await FirebaseAppCheck.instance.activate(
+        androidProvider: AndroidProvider.debug,
+        appleProvider: AppleProvider.debug,
+      );
+    }
+
+    _isAppCheckInitialized = true;
+
+    if (kDebugMode) {
+      print('App Check initialized successfully');
+    }
+  } catch (e) {
+    if (kDebugMode) {
+      print('App Check initialization error: $e');
+    }
+    _isAppCheckInitialized = true;
+  }
+}
+
+// تهيئة Firebase الأساسية
+Future<void> _initializeFirebase() async {
+  try {
+    WidgetsFlutterBinding.ensureInitialized();
+
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+
+    if (kDebugMode) {
+      print('Firebase initialized successfully');
+    }
   } on FirebaseException catch (e) {
-    if (e.code != 'duplicate-app') rethrow;
+    if (e.code != 'duplicate-app') {
+      if (kDebugMode) {
+        print('Firebase initialization error: ${e.message}');
+      }
+      rethrow;
+    }
+  } catch (e) {
+    if (kDebugMode) {
+      print('Unexpected error during Firebase init: $e');
+    }
+    if (!kIsWeb) rethrow;
   }
+}
 
-  // App Check (وضع التطوير)
-  await FirebaseAppCheck.instance.activate(
-    androidProvider: AndroidProvider.debug,
-  );
-
-  // سجل هاندلر الرسائل بالخلفية قبل runApp
-  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+Future<void> main() async {
+  // تهيئة Firebase الأساسية
+  await _initializeFirebase();
 
   runApp(const MyApp());
 
-  // بعد عرض الواجهة: اطلب صلاحيات الإشعارات وجلب/حفظ التوكن
-  WidgetsBinding.instance.addPostFrameCallback((_) async {
-    final sms = SMSService();
-    try {
-      await sms.setupFCM();
-      // في حال المستخدم سجّل لاحقًا، زامن التوكن تلقائيًا
-      sms.listenAuthAndSyncToken();
-    } catch (e) {
-      debugPrint('setupFCM error: $e');
+  _initializeAdditionalServices();
+}
+
+void _initializeAdditionalServices() async {
+  try {
+    await _initializeAppCheck();
+  } catch (e) {
+    if (kDebugMode) {
+      print('Error in additional services initialization: $e');
     }
-  });
+  }
 }
 
 class MyApp extends StatelessWidget {
@@ -92,7 +134,9 @@ class MyApp extends StatelessWidget {
     return MultiBlocProvider(
       providers: [
         BlocProvider<AuthBloc>(create: (_) => AuthBloc(authService)),
-        BlocProvider<HomeBloc>(create: (_) => HomeBloc(authService, firestoreService)),
+        BlocProvider<HomeBloc>(
+          create: (_) => HomeBloc(authService, firestoreService),
+        ),
         BlocProvider<OrphansBloc>(
           create: (_) => OrphansBloc(
             firestore: FirebaseFirestore.instance,
@@ -105,7 +149,9 @@ class MyApp extends StatelessWidget {
         BlocProvider(create: (_) => ReportsBloc(ReportsService())),
         BlocProvider(create: (_) => SupervisorsBloc(firestoreService)),
         BlocProvider(create: (_) => ProfileBloc(firestoreService)),
-        BlocProvider(create: (_) => SponsorshipBloc(firestore: firestoreService)),
+        BlocProvider(
+          create: (_) => SponsorshipBloc(firestore: firestoreService),
+        ),
         BlocProvider(create: (_) => SMSBloc(SMSService())),
       ],
       child: MaterialApp(
@@ -125,7 +171,9 @@ class MyApp extends StatelessWidget {
             case '/home_screen':
               return MaterialPageRoute(builder: (_) => const HomeScreen());
             case '/orphans_archive_list_screen':
-              return MaterialPageRoute(builder: (_) => const OrphanArchivedListScreen());
+              return MaterialPageRoute(
+                builder: (_) => const OrphanArchivedListScreen(),
+              );
             case '/tasks_screen':
               return MaterialPageRoute(builder: (_) => const TasksScreen());
             case '/reports_screen':
@@ -148,18 +196,27 @@ class MyApp extends StatelessWidget {
                 ),
               );
             case '/field_visits_screen':
-              return MaterialPageRoute(builder: (_) => const FieldVisitsScreen());
+              return MaterialPageRoute(
+                builder: (_) => const FieldVisitsScreen(),
+              );
             case '/orphans_list_screen':
-              return MaterialPageRoute(builder: (_) => const OrphansListScreen());
+              return MaterialPageRoute(
+                builder: (_) => const OrphansListScreen(),
+              );
             case '/orphan_details_screen':
               final args = settings.arguments as Map<String, dynamic>?;
               return MaterialPageRoute(
-                builder: (_) => OrphanDetailsScreen(orphanId: args?['orphanId'] ?? '', institutionId: args?['institutionId'],),
+                builder: (_) => OrphanDetailsScreen(
+                  orphanId: args?['orphanId'] ?? '',
+                  institutionId: args?['institutionId'],
+                ),
               );
             case '/profile_screen':
               return MaterialPageRoute(builder: (_) => const ProfileScreen());
             case '/sponsorship_management_screen':
-              return MaterialPageRoute(builder: (_) => const SponsorshipManagementScreen());
+              return MaterialPageRoute(
+                builder: (_) => const SponsorshipManagementScreen(),
+              );
             case '/settings_screen':
               return MaterialPageRoute(builder: (_) => const SettingsScreen());
             case '/send_sms_screen':
@@ -183,12 +240,14 @@ class MyApp extends StatelessWidget {
             case '/edit_supervisors_screen':
               final args = settings.arguments as Map<String, dynamic>?;
               return MaterialPageRoute(
-                builder: (_) => EditSupervisorScreen(user: args?['supervisorData'] ?? {}),
+                builder: (_) =>
+                    EditSupervisorScreen(user: args?['supervisorData'] ?? {}),
               );
             case '/supervisors_details_screen':
               final args = settings.arguments as Map<String, dynamic>?;
               return MaterialPageRoute(
-                builder: (_) => SupervisorDetailsScreen(user: args as UserModel),
+                builder: (_) =>
+                    SupervisorDetailsScreen(user: args as UserModel),
               );
             case '/edit_profile_screen':
               final args = settings.arguments as Map<String, dynamic>?;
@@ -212,11 +271,15 @@ class MyApp extends StatelessWidget {
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
         }
-        if (snapshot.hasData) {
+
+        if (snapshot.hasData && snapshot.data != null) {
           return const HomeScreen();
         }
+
         return const LoginScreen();
       },
     );

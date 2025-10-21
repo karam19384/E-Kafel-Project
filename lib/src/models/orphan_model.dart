@@ -193,6 +193,9 @@ class Orphan {
   String get orphanFullName =>
       '$orphanName $fatherName $grandfatherName  $familyName'.trim();
 
+
+String get orphanFatherFullName =>
+      ' $fatherName $grandfatherName $greatGrandfatherName $familyName'.trim();
   // ===== Helpers آمنة للتحويل =====
   static String? _asString(dynamic v) {
     if (v == null) return null;

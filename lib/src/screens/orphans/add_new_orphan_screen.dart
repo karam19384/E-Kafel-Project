@@ -216,11 +216,70 @@ class _AddNewOrphanScreenState extends State<AddNewOrphanScreen> {
   @override
   void initState() {
     super.initState();
-    // الربط مع اسم/هوية الأم لملء المعيل تلقائيًا عند الحاجة
-    _motherNameController.addListener(_updateBreadwinnerNameFromMother);
-    _motherIdNumberController.addListener(_updateBreadwinnerIdFromMother);
-    // تطبيق قواعد نوع اليُتم في البداية
+    _setupAutoFillListeners();
     _applyOrphanTypeRules();
+  }
+
+  void _setupAutoFillListeners() {
+    // عند تغيير اسم الأم - إذا كان يتيم الأب يتم نسخه للمعيل
+    _motherNameController.addListener(() {
+      if (_selectedOrphanType == 'يتيم الأب') {
+        _breadwinnerNameController.text = _motherNameController.text;
+      }
+    });
+
+    // عند تغيير رقم هوية الأم - إذا كان يتيم الأب يتم نسخه للمتوفى
+    _motherIdNumberController.addListener(() {
+      if (_selectedOrphanType == 'يتيم الأب') {
+        _deceasedIdNumberController.text = _motherIdNumberController.text;
+      }
+    });
+
+    // عند تغيير عمر الأم - إذا كان يتيم الأب يتم نسخه للمعيل
+    _motherAgeController.addListener(() {
+      if (_selectedOrphanType == 'يتيم الأب') {
+        _breadwinnerAgeController.text = _motherAgeController.text;
+      }
+    });
+
+    // عند تغيير اسم الأب - إذا كان يتيم الأم يتم نسخه للمعيل
+    _orphanFatherController.addListener(() {
+      if (_selectedOrphanType == 'يتيم الأم') {
+        _breadwinnerNameController.text = _buildFatherFullName();
+      }
+    });
+
+    // عند تغيير رقم هوية الأب - إذا كان يتيم الأم يتم نسخه للمتوفى
+    _fatherIdNumberController.addListener(() {
+      if (_selectedOrphanType == 'يتيم الأم') {
+        _deceasedIdNumberController.text = _fatherIdNumberController.text;
+      }
+    });
+
+    // عند تغيير عمر الأب - إذا كان يتيم الأم يتم نسخه للمعيل
+    _fatherAgeController.addListener(() {
+      if (_selectedOrphanType == 'يتيم الأم') {
+        _breadwinnerAgeController.text = _fatherAgeController.text;
+      }
+    });
+
+    // عند تغيير أي من أسماء الأب (لبناء الاسم الكامل)
+    _orphanFatherController.addListener(_updateFatherRelatedFields);
+    _orphanGrandController.addListener(_updateFatherRelatedFields);
+    _orphanGreatGrandController.addListener(_updateFatherRelatedFields);
+    _orphanFamilyController.addListener(_updateFatherRelatedFields);
+  }
+
+  void _updateFatherRelatedFields() {
+    final fatherFullName = _buildFatherFullName();
+
+    if (_selectedOrphanType == 'يتيم الأم') {
+      _deceasedNameController.text = _motherNameController.text;
+      _breadwinnerNameController.text = fatherFullName;
+    } else if (_selectedOrphanType == 'يتيم الأب') {
+      _deceasedNameController.text = fatherFullName;
+      _breadwinnerNameController.text = _motherNameController.text;
+    }
   }
 
   @override
@@ -287,30 +346,35 @@ class _AddNewOrphanScreenState extends State<AddNewOrphanScreen> {
   }
 
   void _applyOrphanTypeRules() {
-    // إذا يتيم الأب: المتوفى = بيانات الأب | المعيل = الأم
+    // إذا يتيم الأب: المتوفى = الأب | المعيل = الأم
     if (_selectedOrphanType == 'يتيم الأب') {
       _deceasedNameController.text = _buildFatherFullName();
       _deceasedIdNumberController.text = _fatherIdNumberController.text;
       _breadwinnerNameController.text = _motherNameController.text;
       _breadwinnerIdNumberController.text = _motherIdNumberController.text;
+      _breadwinnerAgeController.text = _motherAgeController.text;
       _selectedBreadwinnerKinship = 'الأم';
+      _selectedBreadwinnerMaritalStatus = 'أرمل/ة';
     }
-    // إذا يتيم الأم: المتوفى = بيانات الأم | المعيل = الأب
+    // إذا يتيم الأم: المتوفى = الأم | المعيل = الأب
     else if (_selectedOrphanType == 'يتيم الأم') {
       _deceasedNameController.text = _motherNameController.text;
       _deceasedIdNumberController.text = _motherIdNumberController.text;
       _breadwinnerNameController.text = _buildFatherFullName();
       _breadwinnerIdNumberController.text = _fatherIdNumberController.text;
+      _breadwinnerAgeController.text = _fatherAgeController.text;
       _selectedBreadwinnerKinship = 'الأب';
+      _selectedBreadwinnerMaritalStatus = 'أرمل/ة';
     }
-    // إذا يتيم الوالدين: المتوفى = الأب + الأم | المعيل يدوياً
+    // إذا يتيم الوالدين: مسح الحقول التلقائية
     else if (_selectedOrphanType == 'يتيم الوالدين') {
-      _deceasedNameController.text =
-          '${_buildFatherFullName()} / ${_motherNameController.text}';
-      _deceasedIdNumberController.clear(); // لا معنى لرقمين في حقل واحد
+      _deceasedNameController.clear();
+      _deceasedIdNumberController.clear();
       _breadwinnerNameController.clear();
       _breadwinnerIdNumberController.clear();
+      _breadwinnerAgeController.clear();
       _selectedBreadwinnerKinship = null;
+      _selectedBreadwinnerMaritalStatus = null;
     }
   }
 
@@ -320,19 +384,6 @@ class _AddNewOrphanScreenState extends State<AddNewOrphanScreen> {
     final gg = _orphanGreatGrandController.text.trim();
     final f = _orphanFamilyController.text.trim();
     return [p, g, gg, f].where((e) => e.isNotEmpty).join(' ');
-  }
-
-  void _updateBreadwinnerNameFromMother() {
-    // يُستخدم فقط إذا النوع "يتيم الأب"
-    if (_selectedOrphanType == 'يتيم الأب') {
-      _breadwinnerNameController.text = _motherNameController.text;
-    }
-  }
-
-  void _updateBreadwinnerIdFromMother() {
-    if (_selectedOrphanType == 'يتيم الأب') {
-      _breadwinnerIdNumberController.text = _motherIdNumberController.text;
-    }
   }
 
   // ================== UI ==================
@@ -519,11 +570,13 @@ class _AddNewOrphanScreenState extends State<AddNewOrphanScreen> {
                 _buildTextField(
                   controller: _deceasedNameController,
                   label: 'اسم المتوفّى الرباعي',
+                  readOnly: _selectedOrphanType != 'يتيم الوالدين',
                 ),
                 _buildTextField(
                   controller: _deceasedIdNumberController,
                   label: 'رقم هوية المتوفّى',
                   keyboardType: TextInputType.number,
+                  readOnly: _selectedOrphanType != 'يتيم الوالدين',
                 ),
                 _buildDropdownField(
                   label: 'سبب الوفاة',
@@ -539,40 +592,88 @@ class _AddNewOrphanScreenState extends State<AddNewOrphanScreen> {
                   onPressed: () => _selectDate(context, isDateOfBirth: false),
                   errorText: _deathDateErrorText,
                 ),
-                _buildFilePicker(
-                  label: 'صورة المتوفّى',
-                  file: _deceasedPhotoFile,
-                  onPressed: () => _pickFile(
-                    onFilePicked: (file) => setState(() {
-                      _deceasedPhotoFile = file;
-                    }),
+
+                // إظهار حقلين لشهادة المتوفى فقط عندما يكون يتيم الوالدين
+                if (_selectedOrphanType == 'يتيم الوالدين') ...[
+                  _buildFilePicker(
+                    label: 'صورة المتوفّى (الأب)',
+                    file: _deceasedPhotoFile,
+                    onPressed: () => _pickFile(
+                      onFilePicked: (file) => setState(() {
+                        _deceasedPhotoFile = file;
+                      }),
+                    ),
                   ),
-                ),
-                _buildFilePicker(
-                  label: 'شهادة الوفاة',
-                  file: _deathCertificateFile,
-                  onPressed: () => _pickFile(
-                    onFilePicked: (file) => setState(() {
-                      _deathCertificateFile = file;
-                    }),
+                  _buildFilePicker(
+                    label: 'شهادة الوفاة (الأب)',
+                    file: _deathCertificateFile,
+                    onPressed: () => _pickFile(
+                      onFilePicked: (file) => setState(() {
+                        _deathCertificateFile = file;
+                      }),
+                    ),
                   ),
-                ),
+                  _buildFilePicker(
+                    label: 'صورة المتوفّى (الأم)',
+                    file:
+                        _deceasedPhotoFile, // يمكنك إضافة ملف منفصل للأم إذا أردت
+                    onPressed: () => _pickFile(
+                      onFilePicked: (file) => setState(() {
+                        // يمكنك التعامل مع ملف الأم بشكل منفصل
+                        _deceasedPhotoFile = file;
+                      }),
+                    ),
+                  ),
+                  _buildFilePicker(
+                    label: 'شهادة الوفاة (الأم)',
+                    file:
+                        _deathCertificateFile, // يمكنك إضافة ملف منفصل للأم إذا أردت
+                    onPressed: () => _pickFile(
+                      onFilePicked: (file) => setState(() {
+                        // يمكنك التعامل مع ملف الأم بشكل منفصل
+                        _deathCertificateFile = file;
+                      }),
+                    ),
+                  ),
+                ] else ...[
+                  _buildFilePicker(
+                    label: 'صورة المتوفّى',
+                    file: _deceasedPhotoFile,
+                    onPressed: () => _pickFile(
+                      onFilePicked: (file) => setState(() {
+                        _deceasedPhotoFile = file;
+                      }),
+                    ),
+                  ),
+                  _buildFilePicker(
+                    label: 'شهادة الوفاة',
+                    file: _deathCertificateFile,
+                    onPressed: () => _pickFile(
+                      onFilePicked: (file) => setState(() {
+                        _deathCertificateFile = file;
+                      }),
+                    ),
+                  ),
+                ],
 
                 // ========== بيانات المعيل ==========
                 _buildSectionTitle('بيانات المعيل'),
                 _buildTextField(
                   controller: _breadwinnerNameController,
                   label: 'اسم المعيل الرباعي',
+                  readOnly: _selectedOrphanType != 'يتيم الوالدين',
                 ),
                 _buildTextField(
                   controller: _breadwinnerIdNumberController,
                   label: 'رقم هوية المعيل',
                   keyboardType: TextInputType.number,
+                  readOnly: _selectedOrphanType != 'يتيم الوالدين',
                 ),
                 _buildTextField(
                   controller: _breadwinnerAgeController,
                   label: 'عمر المعيل',
                   keyboardType: TextInputType.number,
+                  readOnly: _selectedOrphanType != 'يتيم الوالدين',
                 ),
                 _buildDropdownField(
                   label: 'صلة القرابة',
@@ -588,15 +689,21 @@ class _AddNewOrphanScreenState extends State<AddNewOrphanScreen> {
                     'جدة',
                     'أخرى',
                   ],
-                  onChanged: (value) =>
-                      setState(() => _selectedBreadwinnerKinship = value),
+                  onChanged: (String? value) {
+                    if (_selectedOrphanType == 'يتيم الوالدين') {
+                      setState(() => _selectedBreadwinnerKinship = value);
+                    }
+                  },
                 ),
                 _buildDropdownField(
                   label: 'الحالة الاجتماعية',
                   value: _selectedBreadwinnerMaritalStatus,
                   items: const ['أرمل/ة', 'أعزب/ة', 'متزوج/ة', 'مطلق/ة'],
-                  onChanged: (value) =>
-                      setState(() => _selectedBreadwinnerMaritalStatus = value),
+                  onChanged: (String? value) {
+                    if (_selectedOrphanType == 'يتيم الوالدين') {
+                      setState(() => _selectedBreadwinnerMaritalStatus = value);
+                    }
+                  },
                 ),
                 _buildFilePicker(
                   label: 'صورة هوية المعيل',
@@ -607,6 +714,8 @@ class _AddNewOrphanScreenState extends State<AddNewOrphanScreen> {
                     }),
                   ),
                 ),
+
+                // ... باقي الكود بدون تغيير (بيانات العائلة، الاتصال، التعليم، السكن، إلخ)
 
                 // ========== بيانات العائلة ==========
                 _buildSectionTitle('بيانات العائلة'),
@@ -760,6 +869,8 @@ class _AddNewOrphanScreenState extends State<AddNewOrphanScreen> {
       ),
     );
   }
+
+  // ... باقي الدوال المساعدة بدون تغيير (_buildFiveNameSection, _buildGradeDropdown, إلخ)
 
   // ================== أدوات بناء واجهة ==================
   Widget _buildFiveNameSection() {
@@ -1029,7 +1140,6 @@ class _AddNewOrphanScreenState extends State<AddNewOrphanScreen> {
           _deathDateErrorText = null;
         }
       });
-      // عند تغيير التواريخ لا نحتاج إعادة تطبيق قواعد اليتم عادةً
     }
   }
 
@@ -1041,11 +1151,11 @@ class _AddNewOrphanScreenState extends State<AddNewOrphanScreen> {
       return;
     }
     int _generateCustomId() {
-    final random = Random();
-    const min = 10000;
-    const max = 99999;
-    return (min + random.nextInt(max - min));
-  }
+      final random = Random();
+      const min = 10000;
+      const max = 99999;
+      return (min + random.nextInt(max - min));
+    }
 
     setState(() => _isLoading = true);
 
