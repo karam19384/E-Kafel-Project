@@ -68,3 +68,16 @@ class SearchSupervisors extends SupervisorsEvent {
     isActive,
   ];
 }
+
+class ToggleSupervisorActive extends SupervisorsEvent {
+  final String uid;
+  final bool isActive;
+  const ToggleSupervisorActive({required this.uid, required this.isActive});
+}
+
+class LoadSupervisorsByHead extends SupervisorsEvent {
+  final String institutionId;
+  final String kafalaHeadId; // رئيس القسم الحالي
+  final bool isActive;
+  const LoadSupervisorsByHead({required this.institutionId, required this.kafalaHeadId, required this.isActive});
+}

@@ -23,10 +23,22 @@ class _TasksScreenState extends State<TasksScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
+  final _searchController = TextEditingController();
+  
   final String _selectedPriority = 'متوسط';
   final String _selectedStatus = 'pending';
   final DateTime _dueDate = DateTime.now().add(const Duration(days: 1));
   Map<String, dynamic>? _currentUserData;
+  
+  // متغيرات البحث والتصفية
+  bool _showSearchField = false;
+  String _searchQuery = '';
+  String? _statusFilter;
+  String? _priorityFilter;
+  String? _typeFilter;
+  DateTime? _startDateFilter;
+  DateTime? _endDateFilter;
+  String _sortBy = 'dueDate'; // dueDate, priority, createdAt
 
   @override
   void initState() {
@@ -41,34 +53,395 @@ class _TasksScreenState extends State<TasksScreen> {
       _currentUserData = userData;
     });
 
-    // 🔹 أرسل حدث تحميل المهام بعد جلب بيانات المستخدم
     context.read<TasksBloc>().add(
       LoadTasksEvent(_currentUserData?['institutionId'] ?? ''),
     );
   }
 
+  void _showFilterDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.filter_list, color: AppColors.primaryColor),
+              SizedBox(width: 8),
+              Text('تصفية وترتيب المهام'),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // تصفية حسب الحالة
+                _buildFilterSection(
+                  title: 'حالة المهمة',
+                  value: _statusFilter,
+                  options: const ['معلقة', 'مكتملة'],
+                  onChanged: (value) => setDialogState(() => _statusFilter = value),
+                ),
+                
+                const SizedBox(height: 16),
+                
+                // تصفية حسب الأولوية
+                _buildFilterSection(
+                  title: 'الأولوية',
+                  value: _priorityFilter,
+                  options: const ['عالي', 'متوسط', 'منخفض'],
+                  onChanged: (value) => setDialogState(() => _priorityFilter = value),
+                ),
+                
+                const SizedBox(height: 16),
+                
+                // تصفية حسب النوع
+                _buildFilterSection(
+                  title: 'نوع المهمة',
+                  value: _typeFilter,
+                  options: const ['إدارية', 'ميدانية', 'متابعة'],
+                  onChanged: (value) => setDialogState(() => _typeFilter = value),
+                ),
+                
+                const SizedBox(height: 20),
+                const Divider(),
+                const SizedBox(height: 16),
+                
+                // تصفية حسب التاريخ
+                const Text(
+                  'النطاق الزمني',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                const SizedBox(height: 12),
+                
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton.icon(
+                        icon: const Icon(Icons.calendar_today, size: 18),
+                        label: Text(
+                          _startDateFilter == null 
+                              ? 'من تاريخ' 
+                              : '${_startDateFilter!.day}/${_startDateFilter!.month}/${_startDateFilter!.year}',
+                        ),
+                        onPressed: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: _startDateFilter ?? DateTime.now(),
+                            firstDate: DateTime(2020),
+                            lastDate: DateTime(2030),
+                          );
+                          if (picked != null) {
+                            setDialogState(() => _startDateFilter = picked);
+                          }
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: TextButton.icon(
+                        icon: const Icon(Icons.calendar_today, size: 18),
+                        label: Text(
+                          _endDateFilter == null 
+                              ? 'إلى تاريخ' 
+                              : '${_endDateFilter!.day}/${_endDateFilter!.month}/${_endDateFilter!.year}',
+                        ),
+                        onPressed: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: _endDateFilter ?? DateTime.now(),
+                            firstDate: DateTime(2020),
+                            lastDate: DateTime(2030),
+                          );
+                          if (picked != null) {
+                            setDialogState(() => _endDateFilter = picked);
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                
+                if (_startDateFilter != null || _endDateFilter != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: TextButton(
+                      onPressed: () {
+                        setDialogState(() {
+                          _startDateFilter = null;
+                          _endDateFilter = null;
+                        });
+                      },
+                      child: const Text('مسح التواريخ'),
+                    ),
+                  ),
+                
+                const SizedBox(height: 20),
+                const Divider(),
+                const SizedBox(height: 16),
+                
+                // ترتيب النتائج
+                _buildSortSection(setDialogState),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  _statusFilter = null;
+                  _priorityFilter = null;
+                  _typeFilter = null;
+                  _startDateFilter = null;
+                  _endDateFilter = null;
+                  _sortBy = 'dueDate';
+                });
+                Navigator.pop(context);
+              },
+              child: const Text('مسح الكل', style: TextStyle(color: Colors.red)),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('إلغاء'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                setState(() {});
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryColor,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('تطبيق'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterSection({
+    required String title,
+    required String? value,
+    required List<String> options,
+    required Function(String?) onChanged,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+            color: Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            FilterChip(
+              label: const Text('الكل'),
+              selected: value == null,
+              onSelected: (selected) {
+                onChanged(null);
+              },
+              backgroundColor: Colors.grey[200],
+              selectedColor: AppColors.primaryColor.withOpacity(0.2),
+              checkmarkColor: AppColors.primaryColor,
+              labelStyle: TextStyle(
+                color: value == null ? AppColors.primaryColor : Colors.black87,
+                fontWeight: value == null ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+            ...options.map((option) {
+              final isSelected = value == option;
+              return FilterChip(
+                label: Text(option),
+                selected: isSelected,
+                onSelected: (selected) {
+                  onChanged(selected ? option : null);
+                },
+                backgroundColor: Colors.grey[200],
+                selectedColor: AppColors.primaryColor.withOpacity(0.2),
+                checkmarkColor: AppColors.primaryColor,
+                labelStyle: TextStyle(
+                  color: isSelected ? AppColors.primaryColor : Colors.black87,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                ),
+              );
+            }),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSortSection(StateSetter setDialogState) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'ترتيب النتائج',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+            color: Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _buildSortOption('تاريخ الاستحقاق', 'dueDate', setDialogState),
+            _buildSortOption('الأولوية', 'priority', setDialogState),
+            _buildSortOption('تاريخ الإنشاء', 'createdAt', setDialogState),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSortOption(String label, String value, StateSetter setDialogState) {
+    final isSelected = _sortBy == value;
+    return FilterChip(
+      label: Text(label),
+      selected: isSelected,
+      onSelected: (selected) {
+        setDialogState(() => _sortBy = value);
+      },
+      backgroundColor: Colors.grey[200],
+      selectedColor: AppColors.primaryColor.withOpacity(0.2),
+      checkmarkColor: AppColors.primaryColor,
+      labelStyle: TextStyle(
+        color: isSelected ? AppColors.primaryColor : Colors.black87,
+        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+      ),
+    );
+  }
+
+  List<TaskModel> _applyFilters(List<TaskModel> tasks) {
+    var filteredTasks = tasks.where((task) {
+      // تطبيق البحث
+      final matchesSearch = _searchQuery.isEmpty ||
+          task.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+          (task.description).toLowerCase().contains(_searchQuery.toLowerCase()) ||
+          (task.taskLocation ?? '').toLowerCase().contains(_searchQuery.toLowerCase());
+      
+      // تطبيق تصفية الحالة
+      final taskStatus = task.status == 'completed' ? 'مكتملة' : 'معلقة';
+      final matchesStatus = _statusFilter == null || taskStatus == _statusFilter;
+      
+      // تطبيق تصفية الأولوية
+      final matchesPriority = _priorityFilter == null || task.priority == _priorityFilter;
+      
+      // تطبيق تصفية النوع
+      final matchesType = _typeFilter == null || task.taskType == _typeFilter;
+      
+      // تطبيق تصفية التاريخ
+      final matchesStartDate = _startDateFilter == null || 
+          task.dueDate.isAfter(_startDateFilter!.subtract(const Duration(days: 1)));
+      final matchesEndDate = _endDateFilter == null || 
+          task.dueDate.isBefore(_endDateFilter!.add(const Duration(days: 1)));
+      
+      return matchesSearch && matchesStatus && matchesPriority && matchesType && matchesStartDate && matchesEndDate;
+    }).toList();
+
+    // تطبيق الترتيب
+    filteredTasks.sort((a, b) {
+      switch (_sortBy) {
+        case 'priority':
+          final priorityOrder = {'عالي': 3, 'متوسط': 2, 'منخفض': 1};
+          return (priorityOrder[b.priority] ?? 0).compareTo(priorityOrder[a.priority] ?? 0);
+        case 'createdAt':
+          return b.createdAt.compareTo(a.createdAt);
+        case 'dueDate':
+        default:
+          return a.dueDate.compareTo(b.dueDate);
+      }
+    });
+
+    return filteredTasks;
+  }
+
+  bool _hasActiveFilters() {
+    return _statusFilter != null ||
+           _priorityFilter != null ||
+           _typeFilter != null ||
+           _startDateFilter != null ||
+           _endDateFilter != null;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('إدارة المهام'),
-        backgroundColor: AppColors.primaryColor,
-        elevation: 0,
-      ),
+      appBar: _buildAppBar(),
       drawer: _buildDrawer(),
       body: BlocBuilder<TasksBloc, TasksState>(
         builder: (context, state) {
           if (state is TasksLoading) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryColor),
+              ),
+            );
           } else if (state is TasksLoaded) {
             return _buildTasksContent(state.tasks);
           } else if (state is TasksError) {
-            return Center(child: Text('خطأ: ${state.message}'));
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    size: 64,
+                    color: Colors.grey[400],
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'خطأ: ${state.message}',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey[600],
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 20),
+                  ElevatedButton(
+                    onPressed: () {
+                      context.read<TasksBloc>().add(
+                        LoadTasksEvent(_currentUserData?['institutionId'] ?? ''),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryColor,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('إعادة المحاولة'),
+                  ),
+                ],
+              ),
+            );
           }
-          return const Center(child: Text('لا توجد بيانات متاحة'));
+          return const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.task, size: 64, color: Colors.grey),
+                SizedBox(height: 16),
+                Text(
+                  'لا توجد بيانات متاحة',
+                  style: TextStyle(fontSize: 16, color: Colors.grey),
+                ),
+              ],
+            ),
+          );
         },
       ),
-
       floatingActionButton: FloatingActionButton(
         onPressed: _showAddTaskDialog,
         backgroundColor: AppColors.primaryColor,
@@ -77,15 +450,79 @@ class _TasksScreenState extends State<TasksScreen> {
     );
   }
 
+  AppBar _buildAppBar() {
+    return AppBar(
+      title: _showSearchField 
+          ? TextField(
+              controller: _searchController,
+              autofocus: true,
+              decoration: InputDecoration(
+                hintText: 'ابحث في المهام...',
+                border: InputBorder.none,
+                hintStyle: TextStyle(color: Colors.white.withOpacity(0.7)),
+              ),
+              style: const TextStyle(color: Colors.white),
+              onChanged: (value) {
+                setState(() {
+                  _searchQuery = value;
+                });
+              },
+            )
+          : const Text('إدارة المهام'),
+      centerTitle: true,
+      backgroundColor: AppColors.primaryColor,
+      foregroundColor: Colors.white,
+      elevation: 2,
+      actions: [
+        // أيقونة البحث
+        if (!_showSearchField)
+          IconButton(
+            icon: const Icon(Icons.search),
+            onPressed: () {
+              setState(() {
+                _showSearchField = true;
+              });
+            },
+          ),
+        
+        // أيقونة التصفية والترتيب
+        IconButton(
+          icon: Badge(
+            isLabelVisible: _hasActiveFilters(),
+            backgroundColor: Colors.orange,
+            child: const Icon(Icons.filter_list),
+          ),
+          onPressed: _showFilterDialog,
+          tooltip: 'فرز وتصفية المهام',
+        ),
+        
+        // أيقونة إغلاق البحث
+        if (_showSearchField)
+          IconButton(
+            icon: const Icon(Icons.close),
+            onPressed: () {
+              setState(() {
+                _showSearchField = false;
+                _searchQuery = '';
+                _searchController.clear();
+              });
+            },
+          ),
+      ],
+    );
+  }
+
   Widget _buildTasksContent(List<TaskModel> tasks) {
+    final filteredTasks = _applyFilters(tasks);
+    
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _buildTaskStats(tasks),
+          _buildTaskStats(filteredTasks),
           const SizedBox(height: 24),
-          _buildTasksList(tasks),
+          _buildTasksList(filteredTasks),
         ],
       ),
     );
@@ -103,20 +540,22 @@ class _TasksScreenState extends State<TasksScreen> {
           (t) => t.status == 'معلقة' || t.status.toLowerCase() == 'pending',
         )
         .length;
+    final highPriority = tasks.where((t) => t.priority == 'عالي').length;
 
     return Card(
       elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            const Text(
               'إحصائيات المهام',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
-                color: AppColors.primaryColor,
+                color: Colors.black87,
               ),
             ),
             const SizedBox(height: 16),
@@ -146,6 +585,14 @@ class _TasksScreenState extends State<TasksScreen> {
                     Colors.orange,
                   ),
                 ),
+                Expanded(
+                  child: _buildStatItem(
+                    'عالي أولوية',
+                    '$highPriority',
+                    Icons.priority_high,
+                    Colors.red,
+                  ),
+                ),
               ],
             ),
           ],
@@ -162,12 +609,20 @@ class _TasksScreenState extends State<TasksScreen> {
   ) {
     return Column(
       children: [
-        Icon(icon, size: 40, color: color),
+        Container(
+          width: 50,
+          height: 50,
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, size: 24, color: color),
+        ),
         const SizedBox(height: 8),
         Text(
           value,
           style: TextStyle(
-            fontSize: 24,
+            fontSize: 20,
             fontWeight: FontWeight.bold,
             color: color,
           ),
@@ -175,7 +630,10 @@ class _TasksScreenState extends State<TasksScreen> {
         Text(
           title,
           textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 12),
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey[600],
+          ),
         ),
       ],
     );
@@ -183,18 +641,90 @@ class _TasksScreenState extends State<TasksScreen> {
 
   Widget _buildTasksList(List<TaskModel> tasks) {
     if (tasks.isEmpty) {
-      return const Center(child: Text('لا توجد مهام حالياً'));
+      return _buildEmptyTasks();
     }
-    return Card(
-      elevation: 4,
-      child: ListView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: tasks.length,
-        itemBuilder: (context, index) {
-          final task = tasks[index];
-          return _buildTaskItem(task);
-        },
+    
+    return Column(
+      children: [
+        // رأس عدد النتائج
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.grey[50],
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'عدد المهام: ${tasks.length}',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              if (_hasActiveFilters() || _searchQuery.isNotEmpty)
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _searchQuery = '';
+                      _statusFilter = null;
+                      _priorityFilter = null;
+                      _typeFilter = null;
+                      _startDateFilter = null;
+                      _endDateFilter = null;
+                      _searchController.clear();
+                    });
+                  },
+                  child: const Text('مسح الفلاتر'),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        
+        // قائمة المهام
+        ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: tasks.length,
+          itemBuilder: (context, index) {
+            final task = tasks[index];
+            return _buildTaskItem(task);
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEmptyTasks() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.task_alt,
+            size: 80,
+            color: Colors.grey[300],
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'لا توجد مهام حالياً',
+            style: TextStyle(
+              fontSize: 18,
+              color: Colors.grey,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'استخدم زر الإضافة لإنشاء مهمة جديدة',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -206,80 +736,127 @@ class _TasksScreenState extends State<TasksScreen> {
         ? 'معلقة'
         : task.status;
 
-    return ListTile(
-      leading: Icon(
-        Icons.task_alt,
-        color: _getPriorityColor(task.priority),
-        size: 30,
-      ),
-      title: Text(task.title),
-      subtitle: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if ((task.taskLocation ?? '').isNotEmpty)
-            Text('المكان: ${task.taskLocation}'),
-          Text(
-            'تاريخ الاستحقاق: ${task.dueDate.toLocal().toString().split(' ')[0]}',
+    Color statusColor = displayStatus == 'مكتملة' ? Colors.green : Colors.orange;
+    Color priorityColor = _getPriorityColor(task.priority);
+    bool isOverdue = task.dueDate.isBefore(DateTime.now()) && displayStatus == 'معلقة';
+
+    return Card(
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ListTile(
+        contentPadding: const EdgeInsets.all(16),
+        leading: Container(
+          width: 50,
+          height: 50,
+          decoration: BoxDecoration(
+            color: priorityColor.withOpacity(0.1),
+            shape: BoxShape.circle,
           ),
-          Text('مكان المهمة: ${task.taskLocation}'),
-        ],
-      ),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _buildChip(task.priority, _getPriorityColor(task.priority)),
-          const SizedBox(width: 8),
-          _buildChip(
-            displayStatus,
-            displayStatus == 'مكتملة' ? Colors.green : Colors.orange,
+          child: Icon(
+            _getTaskIcon(task.taskType),
+            color: priorityColor,
+            size: 24,
           ),
-          const SizedBox(width: 8),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert),
-            onSelected: (value) {
-              switch (value) {
-                case 'edit':
-                  _showEditTaskDialog(task);
-                  break;
-                case 'delete':
-                  context.read<TasksBloc>().add(
-                    DeleteTaskEvent(
-                      task.id,
-                      _currentUserData?['institutionId'] ?? '',
-                    ),
-                  );
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('تم حذف المهمة')),
-                  );
-                  break;
-                case 'complete':
-                  final updatedTask = task.copyWith(status: 'completed');
-                  context.read<TasksBloc>().add(
-                    UpdateTaskEvent(
-                      updatedTask,
-                      _currentUserData?['institutionId'] ?? '',
-                    ),
-                  );
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('تم وضع المهمة كمكتملة')),
-                  );
-                  break;
-              }
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(value: 'edit', child: Text('تعديل')),
-              const PopupMenuItem(value: 'delete', child: Text('حذف')),
-              if (task.status != 'completed')
-                const PopupMenuItem(
-                  value: 'complete',
-                  child: Text('وضع كمكتملة'),
+        ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              task.title,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+            const SizedBox(height: 4),
+            if ((task.description).isNotEmpty)
+              Text(
+                task.description,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
                 ),
-            ],
-          ),
-        ],
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+          ],
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(Icons.location_on, size: 16, color: Colors.grey),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    task.taskLocation ?? 'غير محدد',
+                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Icon(Icons.calendar_today, size: 16, color: Colors.grey),
+                const SizedBox(width: 4),
+                Text(
+                  task.dueDate.toLocal().toString().split(' ')[0],
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: isOverdue ? Colors.red : Colors.grey[600],
+                    fontWeight: isOverdue ? FontWeight.bold : FontWeight.normal,
+                  ),
+                ),
+                if (isOverdue)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text(
+                        'متأخرة',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+        trailing: Column(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            _buildChip(task.priority, priorityColor),
+            _buildChip(displayStatus, statusColor),
+          ],
+        ),
+        onTap: () => _showTaskDetails(task),
       ),
-      onTap: () => _showTaskDetails(task),
     );
+  }
+
+  IconData _getTaskIcon(String? taskType) {
+    switch (taskType) {
+      case 'ميدانية':
+        return Icons.location_on;
+      case 'متابعة':
+        return Icons.track_changes;
+      case 'إدارية':
+      default:
+        return Icons.assignment;
+    }
   }
 
   Widget _buildChip(String text, Color color) {
@@ -542,26 +1119,82 @@ class _TasksScreenState extends State<TasksScreen> {
     );
   }
 
-  void _showTaskDetails(TaskModel task) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(task.title),
-        content: Column(
+void _showTaskDetails(TaskModel task) {
+  String displayStatus = task.status == 'completed' ? 'مكتملة' : 'معلقة';
+  
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Row(
+        children: [
+          Icon(
+            _getTaskIcon(task.taskType),
+            color: AppColors.primaryColor,
+          ),
+          const SizedBox(width: 8),
+          Expanded(child: Text(task.title)),
+        ],
+      ),
+      content: SingleChildScrollView(
+        child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('الوصف: ${task.description}'),
-            Text('الأولوية: ${task.priority}'),
-            Text('الحالة: ${task.status}'),
-            Text('تاريخ الاستحقاق: ${task.dueDate.toLocal()}'),
+            if ((task.description ?? '').isNotEmpty) ...[
+              const Text(
+                'الوصف:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 4),
+              Text(task.description!),
+              const SizedBox(height: 16),
+            ],
+            
+            _buildDetailRow('نوع المهمة:', task.taskType),
+            _buildDetailRow('الأولوية:', task.priority),
+            _buildDetailRow('الحالة:', displayStatus),
+            _buildDetailRow('المكان:', task.taskLocation ?? 'غير محدد'),
+            _buildDetailRow(
+              'تاريخ الاستحقاق:', 
+              task.dueDate.toLocal().toString().split(' ')[0]
+            ),
+            _buildDetailRow(
+              'تاريخ الإنشاء:', 
+              task.createdAt.toLocal().toString().split(' ')[0]
+            ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('إغلاق'),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('إغلاق'),
+        ),
+        ElevatedButton(
+          onPressed: () => _showEditTaskDialog(task),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primaryColor,
+            foregroundColor: Colors.white,
           ),
+          child: const Text('تعديل'),
+        ),
+      ],
+    ),
+  );
+}
+ 
+  Widget _buildDetailRow(String label, String? value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(width: 8),
+          Expanded(child: Text(value!)),
         ],
       ),
     );
@@ -604,3 +1237,4 @@ class _TasksScreenState extends State<TasksScreen> {
     );
   }
 }
+ 

@@ -1,8 +1,8 @@
+import 'package:e_kafel/src/utils/dropdown_utils_extended.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../blocs/auth/auth_bloc.dart';
 import '../../screens/Home/home_screen.dart';
-import '../..//utils/dropdown_utils.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});

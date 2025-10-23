@@ -26,3 +26,4 @@ class SupervisorsError extends SupervisorsState {
   @override
   List<Object?> get props => [message];
 }
+

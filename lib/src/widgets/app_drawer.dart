@@ -121,6 +121,7 @@ class AppDrawer extends StatelessWidget {
                   builder: (_) => const SupervisorsScreen(
                     institutionId: '',
                     kafalaHeadId: '',
+                    isActive: true,
                   ),
                 ),
               );

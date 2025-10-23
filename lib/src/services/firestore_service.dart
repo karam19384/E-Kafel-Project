@@ -119,6 +119,40 @@ class FirestoreService {
   }
 
 
+
+// استبدل هذه الدالة (لا تحذف نهائياً من Firestore):
+Future<void> removeSupervisor(String uid) async {
+  // ممنوع الحذف — سنكتفي بتعطيل الحساب
+  await _firestore.collection('users').doc(uid).update({
+    'isActive': false,
+    'updatedAt': FieldValue.serverTimestamp(),
+  });
+}
+
+// أضِف:
+Future<void> toggleSupervisorActive(String uid, bool isActive) async {
+  await _firestore.collection('users').doc(uid).update({
+    'isActive': isActive,
+    'updatedAt': FieldValue.serverTimestamp(),
+  });
+}
+
+// عدّل listSupervisors ليقبل kafalaHeadId ويُفلتر:
+Future<List<UserModel>> listSupervisors(String institutionId, {String? kafalaHeadId}) async {
+  Query<Map<String, dynamic>> q = _firestore
+      .collection('users')
+      .where('institutionId', isEqualTo: institutionId)
+      .where('userRole', isEqualTo: 'supervisor');
+
+  if (kafalaHeadId != null && kafalaHeadId.isNotEmpty) {
+    q = q.where('kafalaHeadId', isEqualTo: kafalaHeadId);
+  }
+
+  final snap = await q.get();
+  return snap.docs.map((d) => UserModel.fromMap({...d.data(), 'uid': d.id})).toList();
+}
+
+
   // ====================== المستخدمون (موحّد) ======================
 
   Future<String> createUser(Map<String, dynamic> userData) async {
@@ -447,30 +481,14 @@ Future<String> getInstitutionName(String institutionId) async {
     });
   }
 
-  Future<void> removeSupervisor(String uid) async {
-    await _firestore.collection('users').doc(uid).delete();
-  }
-
   Future<UserModel?> getSupervisorById(String uid) async {
     final doc = await _firestore.collection('users').doc(uid).get();
     if (!doc.exists || doc.data() == null) return null;
     final map = {...doc.data()!, 'uid': doc.id};
     return UserModel.fromMap(map);
   }
-
-  Future<List<UserModel>> listSupervisors(String institutionId) async {
-    final q = await _firestore
-        .collection('users')
-        .where('institutionId', isEqualTo: institutionId)
-        .where('userRole', isEqualTo: 'supervisor')
-        .get();
-
-    return q.docs
-        .map((d) => UserModel.fromMap({...d.data(), 'uid': d.id}))
-        .toList();
-  }
-
-  Future<List<UserModel>> searchSupervisors({
+    
+     Future<List<UserModel>> searchSupervisors({
     required String institutionId,
     String? search,
     String? userRole, // استخدم userRole لو متاح
@@ -517,7 +535,59 @@ Future<String> getInstitutionName(String institutionId) async {
     return list;
   }
 // ====================== الإشعارات ======================
+ // ===== إشعارات موجهة للمستخدم =====
+  Future<void> notifyUser({
+    required String userId,
+    required String title,
+    required String message,
+    String type = 'general',
+    Map<String, dynamic>? extra,
+  }) async {
+    await _firestore.collection('notifications').add({
+      'userId': userId,
+      'title': title,
+      'message': message,
+      'type': type,
+      'isRead': false,
+      'createdAt': FieldValue.serverTimestamp(),
+      ...?extra,
+    });
+  }
 
+
+
+  // ===== جلب مشرفين لرئيس قسم معيّن =====
+  Future<List<Map<String, dynamic>>> listSupervisorsByHead({
+    required String institutionId,
+    required String kafalaHeadId,
+    bool? isActive,
+  }) async {
+    Query<Map<String, dynamic>> q = _firestore
+        .collection('users')
+        .where('institutionId', isEqualTo: institutionId)
+        .where('userRole', isEqualTo: 'supervisor')
+        .where('kafalaHeadId', isEqualTo: kafalaHeadId);
+
+    if (isActive != null) q = q.where('isActive', isEqualTo: isActive);
+
+    final snap = await q.orderBy('createdAt', descending: true).get();
+    return snap.docs.map((d) => {'uid': d.id, ...d.data()}).toList();
+  }
+
+  Future<Map<String, dynamic>?> getUserById(String uid) async {
+    final d = await _firestore.collection('users').doc(uid).get();
+    return d.data();
+  }
+
+  // جلب اسم رئيس القسم من ID
+  Future<String> getHeadNameById(String headUid) async {
+    final d = await _firestore.collection('users').doc(headUid).get();
+    final data = d.data();
+    if (data == null) return '—';
+    return (data['fullName'] as String?)?.trim().isNotEmpty == true
+        ? data['fullName'] as String
+        : '—';
+  }
 /// تحميل إشعارات مستخدم مع ترقيم صفحات (Page Size افتراضي = 20)
 Future<List<Map<String, dynamic>>> getNotificationsPage(
   String uid, {

@@ -708,6 +708,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                                         state.institutionId,
                                                     kafalaHeadId:
                                                         state.kafalaHeadId,
+                                                        isActive: true,
                                                   ),
                                                 ),
                                               );

@@ -33,7 +33,18 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
     final data = await _getUserDataByUid(user.uid);
     if (data == null) {
+      await _firebaseAuth.signOut();
       emit(AuthUnauthenticated());
+      return;
+    }
+
+    // حارس التفعيل
+    final isActive = (data['isActive'] as bool?) ?? true;
+    if (!isActive) {
+      await _firebaseAuth.signOut();
+      emit( AuthUnauthenticated(
+        message: 'تم إلغاء تفعيل حسابك. تواصل مع الإدارة.',
+      ));
       return;
     }
 
@@ -66,7 +77,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       // لو المُعرّف ليس بريد، ابحث بالـ customId في users أولاً، ثم في النظام القديم
       if (!isEmail) {
         final userQuery = await _firestoreService
-            .collection('users') // مُقيّدة النوع داخل FirestoreService
+            .collection('users')
             .where('customId', isEqualTo: event.loginIdentifier)
             .limit(1)
             .get();
@@ -84,8 +95,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
             return;
           }
           userData = legacy;
-          emailToUse = (userData['email'] ?? userData['headEmail'] ?? '')
-              .toString();
+          emailToUse = (userData['email'] ?? userData['headEmail'] ?? '').toString();
           userRole = (userData['userRole'] ?? '').toString();
           institutionId = userData['institutionId'] as String?;
         }
@@ -110,6 +120,16 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           userRole = (userData['userRole'] ?? 'unknown').toString();
           institutionId = userData['institutionId'] as String?;
         }
+      }
+
+      // حارس التفعيل (المهم!)
+      final isActive = (userData['isActive'] as bool?) ?? true;
+      if (!isActive) {
+        await _firebaseAuth.signOut();
+        emit( AuthUnauthenticated(
+          message: 'تم إلغاء تفعيل حسابك. لن تتمكن من تسجيل الدخول.',
+        ));
+        return;
       }
 
       final userName =
@@ -138,7 +158,6 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     }
   }
 
- 
   // ====== Reset Password ======
   Future<void> _onResetPasswordRequested(
     ResetPasswordRequested event,
@@ -186,15 +205,21 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
       final user = _firebaseAuth.currentUser;
       if (user == null) {
-        emit(
-          const AuthErrorState(
-            message: 'فشل الحصول على بيانات المستخدم بعد التسجيل',
-          ),
-        );
+        emit(const AuthErrorState(message: 'فشل الحصول على بيانات المستخدم بعد التسجيل'));
         return;
       }
 
       final data = await _getUserDataByUid(user.uid) ?? {};
+      // حارس التفعيل بعد التسجيل (نادرًا)
+      final isActive = (data['isActive'] as bool?) ?? true;
+      if (!isActive) {
+        await _firebaseAuth.signOut();
+        emit( AuthUnauthenticated(
+          message: 'تم إنشاء الحساب لكن غير مفعّل بعد.',
+        ));
+        return;
+      }
+
       emit(
         AuthAuthenticated(
           userRole: event.userRole,
@@ -228,9 +253,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   // ====== Helpers ======
 
   // البحث في النظام القديم (kafala_heads / supervisors) بالـ customId أو supervisorNo
-  Future<Map<String, dynamic>?> _findUserInLegacySystem(
-    String identifier,
-  ) async {
+  Future<Map<String, dynamic>?> _findUserInLegacySystem(String identifier) async {
     try {
       final kafalaHeadSnapshot = await _firestoreService
           .collection('kafala_heads')
@@ -255,8 +278,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       }
 
       return null;
-    } catch (e) {
-      // تجاهل الخطأ وإرجاع null
+    } catch (_) {
       return null;
     }
   }
@@ -264,28 +286,22 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   // جلب بيانات المستخدم بالـ uid من users أولاً، ثم ترحيل النظام القديم إن لزم
   Future<Map<String, dynamic>?> _getUserDataByUid(String uid) async {
     try {
-      final userDoc = await _firestoreService
-          .collection('users')
-          .doc(uid)
-          .get();
+      final userDoc =
+          await _firestoreService.collection('users').doc(uid).get();
       if (userDoc.exists && userDoc.data() != null) {
         return {...userDoc.data()!, 'uid': userDoc.id};
       }
 
-      final kafalaHeadDoc = await _firestoreService
-          .collection('kafala_heads')
-          .doc(uid)
-          .get();
+      final kafalaHeadDoc =
+          await _firestoreService.collection('kafala_heads').doc(uid).get();
       if (kafalaHeadDoc.exists && kafalaHeadDoc.data() != null) {
         final data = {...kafalaHeadDoc.data()!, 'uid': kafalaHeadDoc.id};
         await _migrateUserData(uid, data);
         return data;
       }
 
-      final supervisorDoc = await _firestoreService
-          .collection('supervisors')
-          .doc(uid)
-          .get();
+      final supervisorDoc =
+          await _firestoreService.collection('supervisors').doc(uid).get();
       if (supervisorDoc.exists && supervisorDoc.data() != null) {
         final data = {...supervisorDoc.data()!, 'uid': supervisorDoc.id};
         await _migrateUserData(uid, data);
@@ -293,7 +309,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       }
 
       return null;
-    } catch (e) {
+    } catch (_) {
       return null;
     }
   }
@@ -307,24 +323,21 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
             data['userRole'] ??
             (data.containsKey('supervisorNo') ? 'supervisor' : 'kafala_head'),
         'institutionId': data['institutionId'] ?? '',
-        'customId':
-            data['customId'] ?? data['supervisorNo'] ?? _generateCustomId(),
+        'customId': data['customId'] ?? data['supervisorNo'] ?? _generateCustomId(),
         'permissions': data['permissions'] ?? [],
         'areaResponsibleFor': data['areaResponsibleFor'] ?? '',
         'functionalLodgment': data['functionalLodgment'] ?? '',
         'createdAt': data['createdAt'] ?? FieldValue.serverTimestamp(),
         'email': data['email'] ?? data['headEmail'] ?? '',
         'mobileNumber': data['mobileNumber'] ?? data['headMobileNumber'] ?? '',
-        'name': data['fullName'] ?? data['headName'] ?? '',
+        'fullName': data['fullName'] ?? data['headName'] ?? '',
         'institutionName': data['institutionName'] ?? '',
         'address': data['address'] ?? '',
-        'kafalaHeadId': data['userRole'] == 'kafala_head'
-            ? uid
-            : (data['kafalaHeadId'] ?? ''),
+        'kafalaHeadId':
+            data['userRole'] == 'kafala_head' ? uid : (data['kafalaHeadId'] ?? ''),
+        'isActive': data['isActive'] ?? true,
       }, SetOptions(merge: true));
-    } catch (_) {
-      /* تجاهل */
-    }
+    } catch (_) {/* تجاهل */}
   }
 
   String _generateCustomId() {

@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:e_kafel/src/blocs/profile/profile_bloc.dart';
 import 'package:e_kafel/src/blocs/supervisors/supervisors_bloc.dart';
 import 'package:e_kafel/src/models/user_model.dart';
+import 'package:e_kafel/src/screens/auth/splash_screen.dart';
 import 'package:e_kafel/src/screens/orphans/add_new_orphan_screen.dart';
 import 'package:e_kafel/src/screens/orphans/edit_orphan_details_screen.dart';
 import 'package:e_kafel/src/screens/orphans/orphan_archiv_list_screen.dart';
@@ -12,8 +14,7 @@ import 'package:e_kafel/src/screens/settings/settings_screen.dart';
 import 'package:e_kafel/src/screens/sms/send_sms_screen.dart';
 import 'package:e_kafel/src/screens/sponsorship/sponsorship_management_screen.dart';
 import 'package:e_kafel/src/screens/supervisors/add_new_supervisor_screen.dart';
-import 'package:e_kafel/src/screens/supervisors/edit_supervisor_screen.dart';
-import 'package:e_kafel/src/screens/supervisors/supervisor_details_screen.dart';
+import 'package:e_kafel/src/screens/supervisors/supervisors_details_screen.dart';
 import 'package:e_kafel/src/screens/supervisors/supervisors_screen.dart';
 import 'package:e_kafel/src/screens/tasks/tasks_screen.dart';
 import 'package:e_kafel/src/screens/visits/field_visits_screen.dart';
@@ -39,92 +40,417 @@ import 'src/blocs/tasks/tasks_bloc.dart';
 import 'src/blocs/visit/visit_bloc.dart';
 import 'src/screens/orphans/orphan_details_screen.dart';
 import 'src/screens/reports/reports_screen.dart';
+import 'src/screens/supervisors/edit_supervisors_details_screen.dart';
 import 'src/services/sms_service.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 
-bool _isAppCheckInitialized = false;
+/// فئة لإدارة تهيئة التطبيق
+class AppInitializer {
+  static bool _isInitialized = false;
 
-Future<void> _initializeAppCheck() async {
-  if (_isAppCheckInitialized) {
-    if (kDebugMode) {
-      print('AppCheck already initialized, skipping...');
-    }
-    return;
-  }
+  static Future<void> initialize() async {
+    if (_isInitialized) return;
 
-  try {
-    if (kIsWeb) {
+    try {
+      WidgetsFlutterBinding.ensureInitialized();
+      
+      // تهيئة Firebase الأساسية
+      await _initializeFirebase();
+      
+      // تهيئة الخدمات الإضافية
+      await _initializeAdditionalServices();
+      
+      _isInitialized = true;
+      
       if (kDebugMode) {
-        print('Skipping App Check for web in development');
+        print('✅ Application initialized successfully');
       }
-    } else {
-      await FirebaseAppCheck.instance.activate(
-        androidProvider: AndroidProvider.debug,
-        appleProvider: AppleProvider.debug,
-      );
-    }
-
-    _isAppCheckInitialized = true;
-
-    if (kDebugMode) {
-      print('App Check initialized successfully');
-    }
-  } catch (e) {
-    if (kDebugMode) {
-      print('App Check initialization error: $e');
-    }
-    _isAppCheckInitialized = true;
-  }
-}
-
-// تهيئة Firebase الأساسية
-Future<void> _initializeFirebase() async {
-  try {
-    WidgetsFlutterBinding.ensureInitialized();
-
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-
-    if (kDebugMode) {
-      print('Firebase initialized successfully');
-    }
-  } on FirebaseException catch (e) {
-    if (e.code != 'duplicate-app') {
+    } catch (e, stack) {
       if (kDebugMode) {
-        print('Firebase initialization error: ${e.message}');
+        print('❌ Application initialization failed: $e');
       }
+      await FirebaseCrashlytics.instance.recordError(e, stack);
       rethrow;
     }
-  } catch (e) {
-    if (kDebugMode) {
-      print('Unexpected error during Firebase init: $e');
+  }
+
+  static Future<void> _initializeFirebase() async {
+    try {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+
+      // تفعيل Crashlytics
+      await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(true);
+      FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterError;
+
+      if (kDebugMode) {
+        print('✅ Firebase initialized successfully');
+      }
+    } on FirebaseException catch (e) {
+      if (e.code != 'duplicate-app') {
+        if (kDebugMode) {
+          print('❌ Firebase initialization error: ${e.message}');
+        }
+        rethrow;
+      }
     }
-    if (!kIsWeb) rethrow;
+  }
+
+  static Future<void> _initializeAdditionalServices() async {
+    try {
+      // تهيئة App Check (للإنتاج استبدل debug بـ safetyNet)
+      if (!kIsWeb) {
+        await FirebaseAppCheck.instance.activate(
+          androidProvider: kDebugMode 
+              ? AndroidProvider.debug 
+              : AndroidProvider.playIntegrity,
+          appleProvider: kDebugMode 
+              ? AppleProvider.debug 
+              : AppleProvider.appAttest,
+        );
+      }
+
+      // تهيئة Analytics
+      await FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(true);
+
+      if (kDebugMode) {
+        print('✅ Additional services initialized successfully');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('⚠️ Additional services initialization warning: $e');
+      }
+      // لا نعيد throw لأن هذه الخدمات ليست حرجة
+    }
   }
 }
 
-Future<void> main() async {
-  // تهيئة Firebase الأساسية
-  await _initializeFirebase();
+/// فئة مركزية لإدارة المسارات
+class AppRoutes {
+  static const String home = '/';
+  static const String login = '/login';
+  static const String orphansList = '/orphans_list_screen';
+  static const String orphanDetails = '/orphan-details';
+  static const String addOrphan = '/add-orphan';
+  static const String editOrphan = '/edit-orphan';
+  static const String orphanArchive = '/orphan-archive';
+  static const String tasks = '/tasks';
+  static const String reports = '/reports';
+  static const String fieldVisits = '/field-visits';
+  static const String profile = '/profile';
+  static const String editProfile = '/edit-profile';
+  static const String sponsorship = '/sponsorship';
+  static const String settings = '/settings';
+  static const String sendSms = '/send-sms';
+  static const String supervisors = '/supervisors';
+  static const String addSupervisor = '/add-supervisor';
+  static const String editSupervisor = '/edit-supervisor';
+  static const String supervisorDetails = '/supervisor-details';
 
-  runApp(const MyApp());
+  static Route<dynamic> generateRoute(RouteSettings setting) {
+    final args = setting.arguments;
 
-  _initializeAdditionalServices();
-}
-
-void _initializeAdditionalServices() async {
-  try {
-    await _initializeAppCheck();
-  } catch (e) {
-    if (kDebugMode) {
-      print('Error in additional services initialization: $e');
+    switch (setting.name) {
+      case home:
+        return MaterialPageRoute(builder: (_) => const AppRoot());
+      
+      case login:
+        return MaterialPageRoute(builder: (_) => const LoginScreen());
+      
+      case orphansList:
+        return MaterialPageRoute(builder: (_) => const OrphansListScreen());
+      
+      case orphanDetails:
+        if (args is Map<String, dynamic>) {
+          return MaterialPageRoute(
+            builder: (_) => OrphanDetailsScreen(
+              orphanId: args['orphanId'] ?? '',
+              institutionId: args['institutionId'],
+            ),
+          );
+        }
+        return _buildErrorRoute('Invalid arguments for orphan details');
+      
+      case addOrphan:
+        if (args is Map<String, dynamic>) {
+          return MaterialPageRoute(
+            builder: (_) => AddNewOrphanScreen(
+              institutionId: args['institutionId'] ?? '',
+              kafalaHeadId: args['kafalaHeadId'] ?? '',
+            ),
+          );
+        }
+        return _buildErrorRoute('Invalid arguments for add orphan');
+      
+      case editOrphan:
+        if (args is Map<String, dynamic>) {
+          return MaterialPageRoute(
+            builder: (_) => EditOrphanDetailsScreen(
+              orphanId: args['orphanId'] ?? '',
+              institutionId: args['institutionId'] ?? '',
+              orphanData: args['orphanData'],
+            ),
+          );
+        }
+        return _buildErrorRoute('Invalid arguments for edit orphan');
+      
+      case orphanArchive:
+        return MaterialPageRoute(builder: (_) => const OrphanArchivedListScreen());
+      
+      case tasks:
+        return MaterialPageRoute(builder: (_) => const TasksScreen());
+      
+      case reports:
+        return MaterialPageRoute(builder: (_) => const ReportsScreen());
+      
+      case fieldVisits:
+        return MaterialPageRoute(builder: (_) => const FieldVisitsScreen());
+      
+      case profile:
+        return MaterialPageRoute(builder: (_) => const ProfileScreen());
+      
+      case editProfile:
+        if (args is Map<String, dynamic>) {
+          return MaterialPageRoute(
+            builder: (_) => EditProfileScreen(profile: args['profile']),
+          );
+        }
+        return _buildErrorRoute('Invalid arguments for edit profile');
+      
+      case sponsorship:
+        return MaterialPageRoute(builder: (_) => const SponsorshipManagementScreen());
+      
+      case settings:
+        return MaterialPageRoute(builder: (_) => const SettingsScreen());
+      
+      case sendSms:
+        return MaterialPageRoute(builder: (_) => const SendSMSScreen());
+      
+      case supervisors:
+        if (args is Map<String, dynamic>) {
+          return MaterialPageRoute(
+            builder: (_) => SupervisorsScreen(
+              institutionId: args['institutionId'] ?? '',
+              kafalaHeadId: args['kafalaHeadId'] ?? '',
+              isActive: true,
+            ),
+          );
+        }
+        return _buildErrorRoute('Invalid arguments for supervisors');
+      
+      case addSupervisor:
+        if (args is Map<String, dynamic>) {
+          return MaterialPageRoute(
+            builder: (_) => AddNewSupervisorScreen(
+              institutionId: args['institutionId'] ?? '',
+              kafalaHeadId: args['kafalaHeadId'] ?? '',
+            ),
+          );
+        }
+        return _buildErrorRoute('Invalid arguments for add supervisor');
+      
+      case editSupervisor:
+        if (args is Map<String, dynamic>) {
+          return MaterialPageRoute(
+            builder: (_) => EditSupervisorsDetailsScreen(
+              user: args['supervisorData'] ?? <String, dynamic>{},
+            ),
+          );
+        }
+        return _buildErrorRoute('Invalid arguments for edit supervisor');
+      
+      case supervisorDetails:
+        if (args is UserModel) {
+          return MaterialPageRoute(
+            builder: (_) => SupervisorsDetailsScreen(user: args, isHeadOfKafala: true,),
+          );
+        }
+        return _buildErrorRoute('Invalid arguments for supervisor details');
+      
+      default:
+        return _buildErrorRoute('No route defined for ${setting.name}');
     }
+  }
+
+  static MaterialPageRoute<dynamic> _buildErrorRoute(String message) {
+    return MaterialPageRoute(
+      builder: (_) => Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 64, color: Colors.red),
+              const SizedBox(height: 20),
+              Text(
+                'خطأ في المسار',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[700],
+                ),
+              ),
+              const SizedBox(height: 10),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class AppRoot extends StatelessWidget {
+  const AppRoot({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        // حالة التحميل
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SplashScreen();
+        }
+
+        if (snapshot.hasError) {
+          return ErrorScreen(
+            error: snapshot.error.toString(),
+            onRetry: () {
+              final authBloc = context.read<AuthBloc>();
+              authBloc.add( CheckAuthStatus());
+            },
+          );
+        }
+
+        final user = snapshot.data;
+        
+        if (user != null && _isValidUser(user)) {
+          return const HomeScreen();
+        }
+
+        return const LoginScreen();
+      },
+    );
+  }
+
+  bool _isValidUser(User user) {
+    return user.uid.isNotEmpty && 
+           (user.emailVerified || _isTestUser(user));
+  }
+
+  bool _isTestUser(User user) {
+    return kDebugMode && (user.email?.contains('test') == true);
+  }
+}
+
+/// شاشة التحميل
+class LoadingScreen extends StatelessWidget {
+  const LoadingScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'جاري التحميل...',
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey[700],
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// شاشة الخطأ
+class ErrorScreen extends StatelessWidget {
+  final String error;
+  final VoidCallback? onRetry;
+
+  const ErrorScreen({
+    super.key,
+    required this.error,
+    this.onRetry,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 64, color: Colors.red),
+            const SizedBox(height: 20),
+            Text(
+              'حدث خطأ',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[800],
+              ),
+            ),
+            const SizedBox(height: 10),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 40),
+              child: Text(
+                error,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ),
+            const SizedBox(height: 30),
+            if (onRetry != null)
+              ElevatedButton(
+                onPressed: onRetry,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 12),
+                ),
+                child: const Text('إعادة المحاولة'),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// فئة مقدمي الخدمات (Service Providers)
+class AppProviders extends StatelessWidget {
+  final Widget child;
+
+  const AppProviders({super.key, required this.child});
 
   @override
   Widget build(BuildContext context) {
@@ -133,10 +459,16 @@ class MyApp extends StatelessWidget {
 
     return MultiBlocProvider(
       providers: [
-        BlocProvider<AuthBloc>(create: (_) => AuthBloc(authService)),
+        // Authentication & Core
+        BlocProvider<AuthBloc>(
+          create: (_) => AuthBloc(authService),
+        ),
+        
         BlocProvider<HomeBloc>(
           create: (_) => HomeBloc(authService, firestoreService),
         ),
+
+        // Data Management
         BlocProvider<OrphansBloc>(
           create: (_) => OrphansBloc(
             firestore: FirebaseFirestore.instance,
@@ -144,144 +476,106 @@ class MyApp extends StatelessWidget {
             firestoreService: firestoreService,
           ),
         ),
-        BlocProvider<VisitBloc>(create: (_) => VisitBloc(firestoreService)),
-        BlocProvider<TasksBloc>(create: (_) => TasksBloc(firestoreService)),
-        BlocProvider(create: (_) => ReportsBloc(ReportsService())),
-        BlocProvider(create: (_) => SupervisorsBloc(firestoreService)),
-        BlocProvider(create: (_) => ProfileBloc(firestoreService)),
-        BlocProvider(
+
+        BlocProvider<VisitBloc>(
+          create: (_) => VisitBloc(firestoreService),
+        ),
+
+        BlocProvider<TasksBloc>(
+          create: (_) => TasksBloc(firestoreService),
+        ),
+
+        BlocProvider<ReportsBloc>(
+          create: (_) => ReportsBloc(ReportsService()),
+        ),
+
+        BlocProvider<SupervisorsBloc>(
+          create: (_) => SupervisorsBloc(firestoreService),
+        ),
+
+        BlocProvider<ProfileBloc>(
+          create: (_) => ProfileBloc(firestoreService),
+        ),
+
+        BlocProvider<SponsorshipBloc>(
           create: (_) => SponsorshipBloc(firestore: firestoreService),
         ),
-        BlocProvider(create: (_) => SMSBloc(SMSService())),
+
+        BlocProvider<SMSBloc>(
+          create: (_) => SMSBloc(SMSService()),
+        ),
       ],
+      child: child,
+    );
+  }
+}
+
+void main() {
+  // تشغيل التطبيق مع معالجة الأخطاء
+  runZonedGuarded(() async {
+    await AppInitializer.initialize();
+    runApp(const MyApp());
+  }, (error, stack) {
+    if (kDebugMode) {
+      print('🔥 Global error: $error');
+    }
+    FirebaseCrashlytics.instance.recordError(error, stack);
+  });
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return AppProviders(
       child: MaterialApp(
         title: 'E-Kafel App',
-        theme: ThemeData(
-          primarySwatch: Colors.green,
-          visualDensity: VisualDensity.adaptivePlatformDensity,
-        ),
+        theme: _buildAppTheme(),
+        darkTheme: _buildDarkTheme(),
+        themeMode: ThemeMode.light,
         debugShowCheckedModeBanner: false,
-        initialRoute: '/',
-        onGenerateRoute: (RouteSettings settings) {
-          switch (settings.name) {
-            case '/':
-              return MaterialPageRoute(builder: (_) => _buildHome());
-            case '/login_screen':
-              return MaterialPageRoute(builder: (_) => const LoginScreen());
-            case '/home_screen':
-              return MaterialPageRoute(builder: (_) => const HomeScreen());
-            case '/orphans_archive_list_screen':
-              return MaterialPageRoute(
-                builder: (_) => const OrphanArchivedListScreen(),
-              );
-            case '/tasks_screen':
-              return MaterialPageRoute(builder: (_) => const TasksScreen());
-            case '/reports_screen':
-              return MaterialPageRoute(builder: (_) => const ReportsScreen());
-            case '/add_new_orphan_screen':
-              final args = settings.arguments as Map<String, dynamic>?;
-              return MaterialPageRoute(
-                builder: (_) => AddNewOrphanScreen(
-                  institutionId: args?['institutionId'] ?? '',
-                  kafalaHeadId: args?['kafalaHeadId'] ?? '',
-                ),
-              );
-            case '/edit_orphan_details_screen':
-              final args = settings.arguments as Map<String, dynamic>?;
-              return MaterialPageRoute(
-                builder: (_) => EditOrphanDetailsScreen(
-                  orphanId: args?['orphanId'] ?? '',
-                  institutionId: args?['institutionId'] ?? '',
-                  orphanData: args!['orphanData'],
-                ),
-              );
-            case '/field_visits_screen':
-              return MaterialPageRoute(
-                builder: (_) => const FieldVisitsScreen(),
-              );
-            case '/orphans_list_screen':
-              return MaterialPageRoute(
-                builder: (_) => const OrphansListScreen(),
-              );
-            case '/orphan_details_screen':
-              final args = settings.arguments as Map<String, dynamic>?;
-              return MaterialPageRoute(
-                builder: (_) => OrphanDetailsScreen(
-                  orphanId: args?['orphanId'] ?? '',
-                  institutionId: args?['institutionId'],
-                ),
-              );
-            case '/profile_screen':
-              return MaterialPageRoute(builder: (_) => const ProfileScreen());
-            case '/sponsorship_management_screen':
-              return MaterialPageRoute(
-                builder: (_) => const SponsorshipManagementScreen(),
-              );
-            case '/settings_screen':
-              return MaterialPageRoute(builder: (_) => const SettingsScreen());
-            case '/send_sms_screen':
-              return MaterialPageRoute(builder: (_) => const SendSMSScreen());
-            case '/supervisors_screen':
-              final args = settings.arguments as Map<String, dynamic>?;
-              return MaterialPageRoute(
-                builder: (_) => SupervisorsScreen(
-                  institutionId: args?['institutionId'] ?? '',
-                  kafalaHeadId: args?['kafalaHeadId'] ?? '',
-                ),
-              );
-            case '/add_new_supervisors_screen':
-              final args = settings.arguments as Map<String, dynamic>?;
-              return MaterialPageRoute(
-                builder: (_) => AddNewSupervisorScreen(
-                  institutionId: args?['institutionId'] ?? '',
-                  kafalaHeadId: args?['kafalaHeadId'] ?? '',
-                ),
-              );
-            case '/edit_supervisors_screen':
-              final args = settings.arguments as Map<String, dynamic>?;
-              return MaterialPageRoute(
-                builder: (_) =>
-                    EditSupervisorScreen(user: args?['supervisorData'] ?? {}),
-              );
-            case '/supervisors_details_screen':
-              final args = settings.arguments as Map<String, dynamic>?;
-              return MaterialPageRoute(
-                builder: (_) =>
-                    SupervisorDetailsScreen(user: args as UserModel),
-              );
-            case '/edit_profile_screen':
-              final args = settings.arguments as Map<String, dynamic>?;
-              return MaterialPageRoute(
-                builder: (_) => EditProfileScreen(profile: args?['profile']),
-              );
-            default:
-              return MaterialPageRoute(
-                builder: (_) => const Scaffold(
-                  body: Center(child: Text('No route defined')),
-                ),
-              );
-          }
+        initialRoute: AppRoutes.home,
+        onGenerateRoute: AppRoutes.generateRoute,
+        navigatorObservers: [
+          FirebaseAnalyticsObserver(analytics: FirebaseAnalytics.instance),
+        ],
+        builder: (context, child) {
+          return MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              textScaleFactor: 1.0, // منع تكبير النص
+            ),
+            child: child!,
+          );
         },
       ),
     );
   }
 
-  Widget _buildHome() {
-    return StreamBuilder<User?>(
-      stream: FirebaseAuth.instance.authStateChanges(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
-        }
+  ThemeData _buildAppTheme() {
+    return ThemeData(
+      primarySwatch: Colors.green,
+      visualDensity: VisualDensity.adaptivePlatformDensity,
+      fontFamily: 'Tajawal', // خط عربي مناسب
+      appBarTheme: const AppBarTheme(
+        centerTitle: true,
+        elevation: 2,
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+    );
+  }
 
-        if (snapshot.hasData && snapshot.data != null) {
-          return const HomeScreen();
-        }
-
-        return const LoginScreen();
-      },
+  ThemeData _buildDarkTheme() {
+    return ThemeData.dark().copyWith(
+      primaryColor: Color(0xFF6DAF97),
+      appBarTheme: const AppBarTheme(
+        centerTitle: true,
+        elevation: 2,
+      ),
     );
   }
 }

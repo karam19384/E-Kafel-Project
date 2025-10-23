@@ -1,40 +1,63 @@
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
 import '../../services/firestore_service.dart';
+import '../../services/auth_service.dart';
+import '../../services/fcm_service.dart';
 import '../../models/user_model.dart';
+
 part 'supervisors_event.dart';
 part 'supervisors_state.dart';
 
 class SupervisorsBloc extends Bloc<SupervisorsEvent, SupervisorsState> {
-  final FirestoreService firestore;
-  SupervisorsBloc(this.firestore) : super(SupervisorsInitial()) {
+  final FirestoreService firestoreService;
+  final AuthService authService;
+  final FCMService fcm;
+
+  SupervisorsBloc(this.firestoreService,
+      {AuthService? auth, FCMService? fcmService})
+      : authService = auth ?? AuthService(),
+        fcm = fcmService ?? FCMService(),
+        super(SupervisorsInitial()) {
     on<LoadSupervisors>(_onLoad);
+    on<LoadSupervisorsByHead>(_onLoadByHead);
     on<SearchSupervisors>(_onSearch);
     on<CreateSupervisorWithAuth>(_onCreateWithAuth);
     on<UpdateSupervisor>(_onUpdate);
-    on<DeleteSupervisor>(_onDelete);
+    // أزلنا DeleteSupervisor
+    on<ToggleSupervisorActive>(_onToggleActive);
   }
 
   Future<void> _onLoad(
-    LoadSupervisors e,
-    Emitter<SupervisorsState> emit,
-  ) async {
+      LoadSupervisors e, Emitter<SupervisorsState> emit) async {
     emit(SupervisorsLoading());
     try {
-      final list = await firestore.listSupervisors(e.institutionId);
+      final list = await firestoreService.listSupervisors(e.institutionId);
       emit(SupervisorsLoaded(list));
     } catch (err) {
       emit(SupervisorsError('فشل تحميل المشرفين: $err'));
     }
   }
 
-  Future<void> _onSearch(
-    SearchSupervisors e,
-    Emitter<SupervisorsState> emit,
-  ) async {
+  Future<void> _onLoadByHead(
+      LoadSupervisorsByHead e, Emitter<SupervisorsState> emit) async {
     emit(SupervisorsLoading());
     try {
-      final list = await firestore.searchSupervisors(
+      final list = await firestoreService.listSupervisorsByHead(
+        institutionId: e.institutionId,
+        kafalaHeadId: e.kafalaHeadId,
+        isActive: e.isActive,
+      );
+      emit(SupervisorsLoaded(list.map((m) => UserModel.fromMap(m)).toList()));
+    } catch (err) {
+      emit(SupervisorsError('فشل تحميل المشرفين: $err'));
+    }
+  }
+
+  Future<void> _onSearch(
+      SearchSupervisors e, Emitter<SupervisorsState> emit) async {
+    emit(SupervisorsLoading());
+    try {
+      final list = await firestoreService.searchSupervisors(
         institutionId: e.institutionId,
         search: e.search,
         userRole: e.userRole,
@@ -48,47 +71,89 @@ class SupervisorsBloc extends Bloc<SupervisorsEvent, SupervisorsState> {
   }
 
   Future<void> _onCreateWithAuth(
-    CreateSupervisorWithAuth e,
-    Emitter<SupervisorsState> emit,
-  ) async {
+      CreateSupervisorWithAuth e, Emitter<SupervisorsState> emit) async {
     try {
-      final uid = await firestore.createSupervisorWithAuth(
+      final uid = await authService.createSupervisorAccount(
         supervisorData: e.data,
         password: e.password,
       );
-      
-      if (uid == null) {
+      if (uid.isEmpty) {
         emit(SupervisorsError('فشل إنشاء الحساب'));
         return;
       }
 
-      // إعادة تحميل القائمة
+      // إشعار للمشرف الجديد
+      await firestoreService.notifyUser(
+        userId: uid,
+        title: 'تم إنشاء حسابك',
+        message: 'مرحباً ${e.data['fullName']}, تم إعداد حسابك كمشرف.',
+        type: 'supervisor_created',
+      );
+      await fcm.sendToUser(
+        userId: uid,
+        title: 'حسابك جاهز',
+        body: 'يمكنك تسجيل الدخول الآن.',
+        data: {'type': 'supervisor_created'},
+      );
+
       final instId = e.data['institutionId'] as String? ?? '';
-      if (instId.isNotEmpty) add(LoadSupervisors(instId));
+      final headId = e.data['kafalaHeadId'] as String? ?? '';
+      if (instId.isNotEmpty && headId.isNotEmpty) {
+        add(LoadSupervisorsByHead(institutionId: instId, kafalaHeadId: headId , isActive: true));
+      } else if (instId.isNotEmpty) {
+        add(LoadSupervisors(instId));
+      }
     } catch (err) {
       emit(SupervisorsError('فشل الإضافة: $err'));
     }
   }
 
   Future<void> _onUpdate(
-    UpdateSupervisor e,
-    Emitter<SupervisorsState> emit,
-  ) async {
+      UpdateSupervisor e, Emitter<SupervisorsState> emit) async {
     try {
-      await firestore.updateSupervisor(e.uid, e.data);
+      await firestoreService.updateSupervisor(e.uid, e.data);
+
+      // إشعار للمشرف المعدّل
+      await firestoreService.notifyUser(
+        userId: e.uid,
+        title: 'تحديث بيانات',
+        message: 'تم تعديل بيانات حسابك من قبل رئيس القسم.',
+        type: 'supervisor_updated',
+      );
+      await fcm.sendToUser(
+        userId: e.uid,
+        title: 'تم تعديل بياناتك',
+        body: 'راجِع صفحتك الشخصية للاطلاع على التغييرات.',
+        data: {'type': 'supervisor_updated'},
+      );
     } catch (err) {
       emit(SupervisorsError('فشل التحديث: $err'));
     }
   }
 
-  Future<void> _onDelete(
-    DeleteSupervisor e,
-    Emitter<SupervisorsState> emit,
-  ) async {
+  Future<void> _onToggleActive(
+      ToggleSupervisorActive e, Emitter<SupervisorsState> emit) async {
     try {
-      await firestore.removeSupervisor(e.uid);
+      await firestoreService.toggleSupervisorActive(e.uid, e.isActive);
+      await firestoreService.notifyUser(
+        userId: e.uid,
+        title: e.isActive ? 'تفعيل الحساب' : 'إلغاء التفعيل',
+        message: e.isActive
+            ? 'تم تفعيل حسابك ويمكنك استخدام النظام.'
+            : 'تم إلغاء تفعيل حسابك. لن يمكنك تسجيل الدخول.',
+        type: 'supervisor_active_toggle',
+        extra: {'isActive': e.isActive},
+      );
+      await fcm.sendToUser(
+        userId: e.uid,
+        title: e.isActive ? 'تم تفعيل الحساب' : 'تم إلغاء التفعيل',
+        body: e.isActive
+            ? 'يمكنك استخدام النظام الآن.'
+            : 'لن تتمكن من تسجيل الدخول حتى إشعار آخر.',
+        data: {'type': 'supervisor_active_toggle'},
+      );
     } catch (err) {
-      emit(SupervisorsError('فشل الحذف: $err'));
+      emit(SupervisorsError('فشل تعديل الحالة: $err'));
     }
   }
 }

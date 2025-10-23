@@ -39,63 +39,52 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
     }
   }
 
-  Future<void> _onUpdateProfile(
-    UpdateProfileRequested event,
-    Emitter<ProfileState> emit,
-  ) async {
-    final current = _profile;
-    if (current == null) {
-      emit(const ProfileError('الملف غير محمّل'));
-      return;
-    }
-    emit(ProfileUpdating(current));
-    try {
-      // حماية الحقول الثابتة
-      final Map<String, dynamic> allowed = Map.of(event.fields)
-        ..remove('customId')
-        ..remove('institutionName')
-        ..remove('institutionId')
-        ..remove('uid')
-        ..remove('userRole'); // لا نسمح بتغيير الدور من الشاشة
+// lib/src/blocs/profile/profile_bloc.dart
 
-      // إذا كان المستخدم مشرف فقط، قَيِّد الحقول
-      if (!current.canEditAll) {
-        allowed
-          ..remove('fullName')
-          ..remove('functionalLodgment')
-          ..remove('areaResponsibleFor')
-          ..remove('notes');
-      }
-
-      await firestoreService.updateProfileFields(current.uid, allowed);
-
-      // حدّث النسخة المحلية
-      final updated = current.copyWith(
-        fullName: allowed['fullName'],
-        email: allowed['email'],
-        mobileNumber: allowed['mobileNumber'],
-        address: allowed['address'],
-        profileImageUrl: allowed['profileImageUrl'],
-        functionalLodgment: allowed['functionalLodgment'],
-        areaResponsibleFor: allowed['areaResponsibleFor'],
-        currentLocation: allowed['currentLocation'],
-        notes: allowed['notes'],
-        updatedAt: DateTime.now(),
-      );
-      _profile = updated;
-      emit(ProfileUpdated(updated));
-
-      // 🔔 إشعار للمستخدم نفسه
-      await _notifyUser(
-        userId: updated.uid,
-        title: 'تم تحديث الملف الشخصي',
-        message: 'تم تحديث بيانات ملفك بنجاح.',
-        type: 'profile_update',
-      );
-    } catch (e) {
-      emit(ProfileError('فشل التحديث: $e'));
-    }
+Future<void> _onUpdateProfile(
+  UpdateProfileRequested event,
+  Emitter<ProfileState> emit,
+) async {
+  final current = _profile;
+  if (current == null) {
+    emit(const ProfileError('الملف غير محمّل'));
+    return;
   }
+  emit(ProfileUpdating(current));
+
+  try {
+    final Map<String, dynamic> allowed = Map.of(event.fields);
+
+    // قفل الحقول الثابتة دوماً
+    const lockedAlways = {
+      'customId','institutionName','institutionId','uid','userRole','kafalaHeadId',
+      'functionalLodgment','areaResponsibleFor','fullName'
+    };
+    for (final k in lockedAlways) { allowed.remove(k); }
+
+    // لو هو مشرف (ليس له صلاحيات كاملة)، لا نسمح إلا بهذه الحقول:
+    if (!current.canEditAll) {
+      final whitelist = {'email','address','profileImageUrl'}; // كلمة المرور لها حدث منفصل
+      allowed.removeWhere((k, v) => !whitelist.contains(k));
+    }
+
+    await firestoreService.updateProfileFields(current.uid, allowed);
+
+    final updated = current.copyWith(
+      fullName: current.fullName, // لا تتغيّر
+      email: allowed['email'],
+      mobileNumber: current.mobileNumber, // لا تتغيّر هنا
+      address: allowed['address'],
+      profileImageUrl: allowed['profileImageUrl'],
+      updatedAt: DateTime.now(),
+    );
+    _profile = updated;
+    emit(ProfileUpdated(updated));
+  } catch (e) {
+    emit(ProfileError('فشل التحديث: $e'));
+  }
+}
+
 
   Future<void> _onUpdatePassword(
     UpdatePasswordRequested event,

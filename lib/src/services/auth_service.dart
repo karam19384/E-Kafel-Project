@@ -1,8 +1,11 @@
 // lib/src/services/auth_service.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+
+import '../../firebase_options.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -48,6 +51,50 @@ class AuthService {
       }
     } catch (e) {
       print('Migration error: $e');
+    }
+  }
+
+  /// إنشاء حساب مشرف دون تبديل جلسة رئيس القسم (باستعمال App ثانوي)
+  Future<String> createSupervisorAccount({
+    required Map<String, dynamic> supervisorData,
+    required String password,
+  }) async {
+    final secondary = await Firebase.initializeApp(
+      name: 'secondary',
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    try {
+      final secondaryAuth = FirebaseAuth.instanceFor(app: secondary);
+      final cred = await secondaryAuth.createUserWithEmailAndPassword(
+        email: supervisorData['email'] as String,
+        password: password,
+      );
+      final uid = cred.user!.uid;
+
+      // خزن بيانات المستخدم
+      await _firestore.collection('users').doc(uid).set({
+        'uid': uid,
+        'userRole': 'supervisor',
+        'isActive': supervisorData['isActive'] ?? true,
+        'kafalaHeadId': supervisorData['kafalaHeadId'],
+        'institutionId': supervisorData['institutionId'],
+        'institutionName': supervisorData['institutionName'],
+        'fullName': supervisorData['fullName'] ?? '',
+        'email': supervisorData['email'],
+        'mobileNumber': supervisorData['mobileNumber'] ?? '',
+        'customId': supervisorData['customId'] ?? '',
+        'areaResponsibleFor': supervisorData['areaResponsibleFor'] ?? '',
+        'functionalLodgment': supervisorData['functionalLodgment'] ?? '',
+        'address': supervisorData['address'] ?? '',
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+        'profileImageUrl': supervisorData['profileImageUrl'] ?? '',
+        'permissions': supervisorData['permissions'] ?? <String>[],
+      }, SetOptions(merge: true));
+
+      return uid;
+    } finally {
+      await secondary.delete();
     }
   }
 
@@ -251,57 +298,6 @@ class AuthService {
   Future<void> signOut() async {
     await _auth.signOut();
   }
-
-// في auth_service.dart - إضافة هذه الدوال
-Future<String?> createSupervisorAccount({
-  required Map<String, dynamic> supervisorData,
-  required String password,
-}) async {
-  try {
-    final email = supervisorData['email'] as String;
-    final name = supervisorData['fullName'] as String;
-    
-    // إنشاء مستخدم في Authentication
-    final userCredential = await _auth.createUserWithEmailAndPassword(
-      email: email,
-      password: password,
-    );
-
-    final user = userCredential.user;
-    if (user == null) return 'فشل إنشاء الحساب';
-
-    // إعداد البيانات للمشرف
-    final customId = _generateCustomId();
-    
-    final userData = {
-      'uid': user.uid,
-      'userRole': 'supervisor',
-      'institutionId': supervisorData['institutionId'] ?? '',
-      'institutionName': supervisorData['institutionName'] ?? '',
-      'customId': customId,
-      'permissions': supervisorData['permissions'] ?? ['supervisor'],
-      'areaResponsibleFor': supervisorData['areaResponsibleFor'] ?? '',
-      'functionalLodgment': supervisorData['functionalLodgment'] ?? '',
-      'createdAt': FieldValue.serverTimestamp(),
-      'email': email,
-      'mobileNumber': supervisorData['mobileNumber'] ?? '',
-      'name': name,
-      'fullName': name,
-      'address': supervisorData['address'] ?? '',
-      'kafalaHeadId': supervisorData['kafalaHeadId'] ?? '',
-      'isActive': true,
-    };
-
-    // حفظ في Firestore
-    await _firestore.collection('users').doc(user.uid).set(userData);
-    
-    return user.uid;
-  } on FirebaseAuthException catch (e) {
-    return e.message;
-  } catch (e) {
-    return e.toString();
-  }
-}
 
 Future<String?> createUserWithEmailAndPassword({
   required String email,

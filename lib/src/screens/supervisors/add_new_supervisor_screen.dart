@@ -1,14 +1,18 @@
+// lib/src/screens/supervisors/add_new_supervisor_screen.dart
+import 'dart:io';
 import 'dart:math';
-
-import 'package:e_kafel/src/services/firestore_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../utils/dropdown_utils.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import '../../blocs/supervisors/supervisors_bloc.dart';
+import '../../services/firestore_service.dart';
+import '../../utils/dropdown_utils_extended.dart';
 
 class AddNewSupervisorScreen extends StatefulWidget {
   final String institutionId;
   final String kafalaHeadId;
+
   const AddNewSupervisorScreen({
     super.key,
     required this.institutionId,
@@ -20,6 +24,9 @@ class AddNewSupervisorScreen extends StatefulWidget {
 }
 
 class _AddNewSupervisorScreenState extends State<AddNewSupervisorScreen> {
+  final _form = GlobalKey<FormState>();
+
+  // نصيّة
   final _name = TextEditingController();
   final _email = TextEditingController();
   final _phone = TextEditingController();
@@ -27,15 +34,23 @@ class _AddNewSupervisorScreenState extends State<AddNewSupervisorScreen> {
   final _password = TextEditingController();
   final _confirmPassword = TextEditingController();
 
-  String? _area;
-  String? _functional;
-  String _institutionName = 'جاري التحميل...';
-  bool _isLoading = false;
-  bool _obscurePassword = true;
-  bool _obscureConfirmPassword = true;
+  // Dropdown + "أخرى"
+  String? _area; // القيمة المختارة من القائمة
+  String? _functional; // القيمة المختارة من القائمة
+  final _areaOther = TextEditingController(); // عند اختيار "أخرى"
+  final _functionalOther = TextEditingController(); // عند اختيار "أخرى"
 
-  final _form = GlobalKey<FormState>();
-  final FirestoreService _firestoreService = FirestoreService();
+  // خيارات القوائم (عدّلها بما يناسبك أو اجلبها من Firestore)
+
+  final _firestoreService = FirestoreService();
+  String _institutionName = 'جاري التحميل...';
+
+  final _picker = ImagePicker();
+  File? _pickedImage;
+  bool _uploadingPhoto = false;
+  String? _uploadedPhotoUrl;
+
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -44,20 +59,11 @@ class _AddNewSupervisorScreenState extends State<AddNewSupervisorScreen> {
   }
 
   Future<void> _loadInstitutionName() async {
-    try {
-      final name = await _firestoreService.getInstitutionName(widget.institutionId);
-      if (mounted) {
-        setState(() {
-          _institutionName = name;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _institutionName = 'غير محدد';
-        });
-      }
-    }
+    final name = await _firestoreService.getInstitutionName(
+      widget.institutionId,
+    );
+    if (!mounted) return;
+    setState(() => _institutionName = name);
   }
 
   @override
@@ -68,21 +74,45 @@ class _AddNewSupervisorScreenState extends State<AddNewSupervisorScreen> {
     _address.dispose();
     _password.dispose();
     _confirmPassword.dispose();
+    _areaOther.dispose();
+    _functionalOther.dispose();
     super.dispose();
   }
 
-  void _save() {
+  // ==== صورة المشرف ====
+  Future<void> _pickImage(ImageSource source) async {
+    final x = await _picker.pickImage(source: source, imageQuality: 70);
+    if (x == null) return;
+    setState(() {
+      _pickedImage = File(x.path);
+    });
+  }
+
+  Future<void> _uploadPhotoIfAny() async {
+    if (_pickedImage == null) return;
+    try {
+      setState(() => _uploadingPhoto = true);
+      final path =
+          'supervisors/profile_photos/${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final ref = FirebaseStorage.instance.ref().child(path);
+      await ref.putFile(_pickedImage!);
+      final url = await ref.getDownloadURL();
+      setState(() => _uploadedPhotoUrl = url);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('تعذر رفع الصورة: $e')));
+    } finally {
+      if (mounted) setState(() => _uploadingPhoto = false);
+    }
+  }
+
+  // ==== حفظ ====
+  void _save() async {
     if (!_form.currentState!.validate()) return;
 
-    // التحقق من أن جميع المتحكمات مهيأة
-    if (!_isControllersInitialized()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('خطأ في تهيئة البيانات')),
-      );
-      return;
-    }
-
-    // التحقق من أن اسم المؤسسة تم تحميله
+    // تحقق من تحميل بيانات المؤسسة
     if (_institutionName == 'جاري التحميل...') {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('جاري تحميل بيانات المؤسسة...')),
@@ -90,32 +120,34 @@ class _AddNewSupervisorScreenState extends State<AddNewSupervisorScreen> {
       return;
     }
 
-    // التحقق من كلمة المرور
+    // كلمة المرور
     if (_password.text.length < 6) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('كلمة المرور يجب أن تكون 6 أحرف على الأقل')),
+        const SnackBar(
+          content: Text('كلمة المرور يجب أن تكون 6 أحرف على الأقل'),
+        ),
       );
       return;
     }
-
     if (_password.text != _confirmPassword.text) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('كلمات المرور غير متطابقة')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('كلمات المرور غير متطابقة')));
       return;
     }
 
-    _createSupervisorWithAuth();
-  }
+    setState(() => _isLoading = true);
 
-  void _createSupervisorWithAuth() {
-    if (_isLoading) return;
-
-    setState(() {
-      _isLoading = true;
-    });
+    // ارفع الصورة (إن وُجدت)
+    await _uploadPhotoIfAny();
 
     final customId = _generateCustomId();
+
+    // حسم قيم الدروب داون (مع "أخرى")
+    final areaValue = _area == 'أخرى' ? _areaOther.text.trim() : (_area ?? '');
+    final functionalValue = _functional == 'أخرى'
+        ? _functionalOther.text.trim()
+        : (_functional ?? '');
 
     context.read<SupervisorsBloc>().add(
       CreateSupervisorWithAuth(
@@ -127,27 +159,22 @@ class _AddNewSupervisorScreenState extends State<AddNewSupervisorScreen> {
           'institutionName': _institutionName,
           'customId': customId,
           'kafalaHeadId': widget.kafalaHeadId,
-          'areaResponsibleFor': _area ?? '',
-          'functionalLodgment': _functional ?? '',
+          'areaResponsibleFor': areaValue,
+          'functionalLodgment': functionalValue,
           'address': _address.text.trim(),
           'userRole': 'supervisor',
           'isActive': true,
           'createdAt': DateTime.now(),
           'updatedAt': DateTime.now(),
-          'profileImageUrl': '',
+          'profileImageUrl': _uploadedPhotoUrl ?? '',
         },
         password: _password.text,
       ),
     );
-    
-    Future.microtask(() {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-        Navigator.pop(context, true);
-      }
-    });
+
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+    Navigator.pop(context, true);
   }
 
   String _generateCustomId() {
@@ -157,13 +184,44 @@ class _AddNewSupervisorScreenState extends State<AddNewSupervisorScreen> {
     return (min + random.nextInt(max - min)).toString();
   }
 
-  bool _isControllersInitialized() {
-    return _name.text.isNotEmpty &&
-           _email.text.isNotEmpty &&
-           _phone.text.isNotEmpty &&
-           _address.text.isNotEmpty &&
-           _password.text.isNotEmpty &&
-           _confirmPassword.text.isNotEmpty;
+  void _showPickSheet() {
+    showModalBottomSheet(
+      context: context,
+      builder: (_) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo),
+              title: const Text('اختيار من المعرض'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickImage(ImageSource.gallery);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_camera),
+              title: const Text('التقاط صورة بالكاميرا'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickImage(ImageSource.camera);
+              },
+            ),
+            if (_pickedImage != null)
+              ListTile(
+                leading: const Icon(Icons.delete_outline),
+                title: const Text('إزالة الصورة'),
+                onTap: () {
+                  Navigator.pop(context);
+                  setState(() {
+                    _pickedImage = null;
+                    _uploadedPhotoUrl = null;
+                  });
+                },
+              ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -178,224 +236,225 @@ class _AddNewSupervisorScreenState extends State<AddNewSupervisorScreen> {
               duration: const Duration(seconds: 4),
             ),
           );
-          setState(() {
-            _isLoading = false;
-          });
-        } else if (state is SupervisorsLoaded) {
-          // تمت الإضافة بنجاح
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('تم إضافة المشرف بنجاح'),
-              backgroundColor: Colors.green,
-            ),
-          );
         }
       },
       child: Scaffold(
         appBar: AppBar(title: const Text('إضافة مشرف')),
         body: _isLoading
             ? const Center(child: CircularProgressIndicator())
-            : Padding(
-                padding: const EdgeInsets.all(16),
-                child: Form(
-                  key: _form,
-                  child: ListView(
-                    children: [
-                      // عرض اسم المؤسسة
-                      Card(
-                        color: Colors.grey[50],
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.business, color: Colors.teal, size: 20),
-                              const SizedBox(width: 8),
-                              const Text(
-                                'المؤسسة:',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.teal,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  _institutionName,
-                                  style: const TextStyle(fontSize: 16),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      TextFormField(
-                        controller: _name,
-                        decoration: const InputDecoration(
-                          labelText: 'الاسم الكامل',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.person),
-                        ),
-                        validator: (v) =>
-                            v == null || v.isEmpty ? 'أدخل الاسم' : null,
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _email,
-                        decoration: const InputDecoration(
-                          labelText: 'البريد الإلكتروني',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.email),
-                        ),
-                        keyboardType: TextInputType.emailAddress,
-                        validator: (v) {
-                          if (v == null || v.isEmpty) return 'أدخل البريد الإلكتروني';
-                          if (!RegExp(r'\S+@\S+\.\S+').hasMatch(v))
-                            return 'صيغة البريد الإلكتروني غير صحيحة';
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _phone,
-                        decoration: const InputDecoration(
-                          labelText: 'رقم الجوال',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.phone),
-                        ),
-                        keyboardType: TextInputType.phone,
-                        validator: (v) {
-                          if (v == null || v.isEmpty) return 'أدخل رقم الجوال';
-                          if (v.length < 7) return 'رقم الجوال غير صالح';
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _address,
-                        decoration: const InputDecoration(
-                          labelText: 'العنوان',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.location_on),
-                        ),
-                        keyboardType: TextInputType.streetAddress,
-                        validator: (v) =>
-                            v == null || v.isEmpty ? 'أدخل العنوان' : null,
-                      ),
-                      const SizedBox(height: 12),
-
-                      // حقل كلمة المرور
-                      TextFormField(
-                        controller: _password,
-                        obscureText: _obscurePassword,
-                        decoration: InputDecoration(
-                          labelText: 'كلمة المرور',
-                          border: const OutlineInputBorder(),
-                          prefixIcon: const Icon(Icons.lock),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _obscurePassword
-                                  ? Icons.visibility
-                                  : Icons.visibility_off,
+            : Form(
+                key: _form,
+                child: ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    // اسم المؤسسة
+                    Card(
+                      color: Colors.grey[50],
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.business,
+                              color: Colors.teal,
+                              size: 20,
                             ),
-                            onPressed: () {
-                              setState(() {
-                                _obscurePassword = !_obscurePassword;
-                              });
-                            },
-                          ),
-                        ),
-                        validator: (v) {
-                          if (v == null || v.isEmpty) {
-                            return 'أدخل كلمة المرور';
-                          }
-                          if (v.length < 6) {
-                            return 'كلمة المرور يجب أن تكون 6 أحرف على الأقل';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 12),
-
-                      // حقل تأكيد كلمة المرور
-                      TextFormField(
-                        controller: _confirmPassword,
-                        obscureText: _obscureConfirmPassword,
-                        decoration: InputDecoration(
-                          labelText: 'تأكيد كلمة المرور',
-                          border: const OutlineInputBorder(),
-                          prefixIcon: const Icon(Icons.lock_outline),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _obscureConfirmPassword
-                                  ? Icons.visibility
-                                  : Icons.visibility_off,
+                            const SizedBox(width: 8),
+                            const Text(
+                              'المؤسسة:',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.teal,
+                              ),
                             ),
-                            onPressed: () {
-                              setState(() {
-                                _obscureConfirmPassword = !_obscureConfirmPassword;
-                              });
-                            },
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _institutionName,
+                                style: const TextStyle(fontSize: 16),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // صورة المشرف
+                    Center(
+                      child: Stack(
+                        children: [
+                          CircleAvatar(
+                            radius: 46,
+                            backgroundColor: const Color(
+                              0xFF6DAF97,
+                            ).withOpacity(.15),
+                            backgroundImage: _pickedImage != null
+                                ? FileImage(_pickedImage!)
+                                : (_uploadedPhotoUrl != null &&
+                                      _uploadedPhotoUrl!.isNotEmpty)
+                                ? NetworkImage(_uploadedPhotoUrl!)
+                                      as ImageProvider
+                                : null,
+                            child:
+                                (_pickedImage == null &&
+                                    (_uploadedPhotoUrl == null ||
+                                        _uploadedPhotoUrl!.isEmpty))
+                                ? const Icon(
+                                    Icons.person,
+                                    size: 40,
+                                    color: Color(0xFF6DAF97),
+                                  )
+                                : null,
                           ),
-                        ),
-                        validator: (v) {
-                          if (v == null || v.isEmpty) {
-                            return 'أدخل تأكيد كلمة المرور';
-                          }
-                          if (v != _password.text) {
-                            return 'كلمات المرور غير متطابقة';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 12),
-
-                      LabeledDropdown(
-                        label: 'المنطقة المسؤولة',
-                        items: kAreasOptions,
-                        value: _area,
-                        onChanged: (v) => setState(() => _area = v),
-                        validator: (v) => v == null ? 'اختر المنطقة المسؤولة' : null,
-                      ),
-                      const SizedBox(height: 12),
-
-                      LabeledDropdown(
-                        label: 'المهام الوظيفية',
-                        items: kFunctionalLodgmentOptions,
-                        value: _functional,
-                        onChanged: (v) => setState(() => _functional = v),
-                        validator: (v) => v == null ? 'اختر المهام الوظيفية' : null,
-                      ),
-                      const SizedBox(height: 24),
-
-                      ElevatedButton(
-                        onPressed: _isLoading ? null : _save,
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          backgroundColor: _isLoading ? Colors.grey : Colors.teal,
-                        ),
-                        child: _isLoading
-                            ? const Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: InkWell(
+                              onTap: _showPickSheet,
+                              child: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF6DAF97),
+                                  borderRadius: BorderRadius.circular(20),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(.15),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 2),
                                     ),
-                                  ),
-                                  SizedBox(width: 8),
-                                  Text('جاري الإضافة...'),
-                                ],
-                              )
-                            : const Text('حفظ المشرف'),
+                                  ],
+                                ),
+                                child: const Icon(
+                                  Icons.edit,
+                                  size: 18,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (_uploadingPhoto) ...[
+                      const SizedBox(height: 8),
+                      const Center(
+                        child: LinearProgressIndicator(minHeight: 2),
                       ),
                     ],
-                  ),
+                    const SizedBox(height: 16),
+
+                    // الاسم
+                    TextFormField(
+                      controller: _name,
+                      decoration: const InputDecoration(
+                        labelText: 'الاسم الكامل',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.person),
+                      ),
+                      validator: (v) =>
+                          v == null || v.isEmpty ? 'أدخل الاسم' : null,
+                    ),
+                    const SizedBox(height: 12),
+
+                    // البريد
+                    TextFormField(
+                      controller: _email,
+                      decoration: const InputDecoration(
+                        labelText: 'البريد الإلكتروني',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.alternate_email),
+                      ),
+                      keyboardType: TextInputType.emailAddress,
+                      validator: (v) => (v == null || !v.contains('@'))
+                          ? 'أدخل بريدًا صحيحًا'
+                          : null,
+                    ),
+                    const SizedBox(height: 12),
+
+                    // الجوال
+                    TextFormField(
+                      controller: _phone,
+                      decoration: const InputDecoration(
+                        labelText: 'رقم الجوال',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.phone_iphone),
+                      ),
+                      keyboardType: TextInputType.phone,
+                      validator: (v) => (v == null || v.trim().isEmpty)
+                          ? 'أدخل رقم الجوال'
+                          : null,
+                    ),
+                    const SizedBox(height: 12),
+
+                    // العنوان
+                    TextFormField(
+                      controller: _address,
+                      decoration: const InputDecoration(
+                        labelText: 'العنوان',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.home_outlined),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // المنطقة المسؤولة (Dropdown)
+                    DropdownHelper.dropdownWithOther(
+                      label: 'المنطقة المسؤولة',
+                      value: _area,
+                      options: kAreasOptions,
+                      onChanged: (v) => setState(() => _area = v),
+                      otherController: _areaOther,
+                    ),
+                    SizedBox(height: 12),
+                    DropdownHelper.dropdownWithOther(
+                      label: 'المسمى/المهام الوظيفية',
+                      value: _functional,
+                      options: kFunctionalLodgmentOptions,
+                      onChanged: (v) => setState(() => _functional = v),
+                      otherController: _functionalOther,
+                    ),
+                    const SizedBox(height: 12),
+
+                    // كلمة المرور
+                    TextFormField(
+                      controller: _password,
+                      decoration: const InputDecoration(
+                        labelText: 'كلمة المرور',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.lock_outline),
+                      ),
+                      obscureText: true,
+                    ),
+                    const SizedBox(height: 12),
+
+                    // تأكيد كلمة المرور
+                    TextFormField(
+                      controller: _confirmPassword,
+                      decoration: const InputDecoration(
+                        labelText: 'تأكيد كلمة المرور',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.lock_reset),
+                      ),
+                      obscureText: true,
+                    ),
+                    const SizedBox(height: 16),
+
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: _isLoading ? null : _save,
+                        icon: const Icon(Icons.save),
+                        label: const Text('حفظ'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF6DAF97),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
       ),
