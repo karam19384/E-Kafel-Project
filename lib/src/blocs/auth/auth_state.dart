@@ -57,3 +57,69 @@ class PasswordResetSent extends AuthState {
 
 // ✅ حالة جديدة للتسجيل الاجتماعي
 class SocialSignInLoading extends AuthState {}
+
+class GoogleLinkSuccess extends AuthState {
+  final User user;
+  const GoogleLinkSuccess(this.user);
+
+  @override
+  List<Object> get props => [user];
+}
+
+class GoogleLinkFailure extends AuthState {
+  final String error;
+  const GoogleLinkFailure(this.error);
+
+  @override
+  List<Object> get props => [error];
+}
+
+class GoogleUnlinkSuccess extends AuthState {
+  const GoogleUnlinkSuccess();
+}
+
+class GoogleLinkChecked extends AuthState {
+  final bool isLinked;
+  const GoogleLinkChecked(this.isLinked);
+
+  @override
+  List<Object> get props => [isLinked];
+}
+// في auth_state.dart - أضف هذه الحالات
+class EmailVerificationSent extends AuthState {
+  final String email;
+  const EmailVerificationSent(this.email);
+  
+  @override
+  List<Object> get props => [email];
+}
+
+class EmailVerified extends AuthState {
+  final String email;
+  const EmailVerified(this.email);
+  
+  @override
+  List<Object> get props => [email];
+}
+
+class EmailUnlinked extends AuthState {
+  const EmailUnlinked();
+  
+  @override
+  List<Object> get props => [];
+}
+
+class EmailLinkStatusChecked extends AuthState {
+  final bool isLinked;
+  final String? email;
+  final bool isVerified;
+  
+  const EmailLinkStatusChecked({
+    required this.isLinked,
+    this.email,
+    this.isVerified = false,
+  });
+  
+  @override
+  List<Object> get props => [isLinked, isVerified];
+}

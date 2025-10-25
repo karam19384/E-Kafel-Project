@@ -8,3 +8,5 @@ analyzer:
     no_leading_underscores_for_local_identifiers: ignore
     avoid_print: ignore
     unused_field: ignore
+    dead_code: ignore
+    unused_local_variable: ignore

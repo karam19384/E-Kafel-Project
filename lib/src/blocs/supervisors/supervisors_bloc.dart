@@ -45,7 +45,6 @@ class SupervisorsBloc extends Bloc<SupervisorsEvent, SupervisorsState> {
       final list = await firestoreService.listSupervisorsByHead(
         institutionId: e.institutionId,
         kafalaHeadId: e.kafalaHeadId,
-        isActive: e.isActive,
       );
       emit(SupervisorsLoaded(list.map((m) => UserModel.fromMap(m)).toList()));
     } catch (err) {
@@ -62,7 +61,6 @@ class SupervisorsBloc extends Bloc<SupervisorsEvent, SupervisorsState> {
         search: e.search,
         userRole: e.userRole,
         areaResponsibleFor: e.areaResponsibleFor,
-        isActive: e.isActive,
       );
       emit(SupervisorsLoaded(list));
     } catch (err) {

@@ -1140,13 +1140,13 @@ void _showTaskDetails(TaskModel task) {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if ((task.description ?? '').isNotEmpty) ...[
+            if ((task.description ).isNotEmpty) ...[
               const Text(
                 'الوصف:',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 4),
-              Text(task.description!),
+              Text(task.description),
               const SizedBox(height: 16),
             ],
             

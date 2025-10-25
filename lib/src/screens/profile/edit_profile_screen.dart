@@ -7,6 +7,8 @@ import '../../utils/app_colors.dart';
 import '../../utils/dropdown_utils_extended.dart';
 
 class EditProfileScreen extends StatefulWidget {
+    static const routeName = '/edit-profile';
+
   final Profile? profile;
   const EditProfileScreen({super.key, required this.profile});
 

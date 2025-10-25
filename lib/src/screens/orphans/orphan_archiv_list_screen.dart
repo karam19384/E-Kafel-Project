@@ -10,7 +10,7 @@ import '../../models/orphan_model.dart';
 import 'orphan_details_screen.dart';
 
 class OrphanArchivedListScreen extends StatefulWidget {
-  static const routeName = '/orphan_archiv_list_screen';
+  static const routeName = '/orphan_archive_list_screen';
 
   const OrphanArchivedListScreen({super.key});
 

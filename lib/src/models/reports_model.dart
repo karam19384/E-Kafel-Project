@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:e_kafel/src/models/filter_model.dart';
 
 class ReportModel {
   final String reportId;
@@ -42,7 +43,22 @@ class ReportModel {
     this.sortBy,
     this.sortAscending = true,
   });
-
+// في class ReportModel - أضف هذه الدالة
+ReportFilter toFilter() {
+  return ReportFilter(
+    reportType: reportType,
+    governorate: region,
+    city: city,
+    orphanStatus: orphanStatus,
+    sponsorType: sponsorType,
+    financialStatus: financialStatus,
+    searchQuery: searchQuery,
+    sortBy: sortBy,
+    sortAscending: sortAscending,
+    startDate: startDate,
+    endDate: endDate,
+  );
+}
   ReportModel copyWith({
     String? reportId,
     String? kafalaHeadId,

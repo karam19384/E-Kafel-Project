@@ -193,8 +193,7 @@ class Orphan {
   String get orphanFullName =>
       '$orphanName $fatherName $grandfatherName  $familyName'.trim();
 
-
-String get orphanFatherFullName =>
+  String get orphanFatherFullName =>
       ' $fatherName $grandfatherName $greatGrandfatherName $familyName'.trim();
   // ===== Helpers آمنة للتحويل =====
   static String? _asString(dynamic v) {
@@ -300,7 +299,9 @@ String get orphanFatherFullName =>
       'deceasedIdNumber': deceasedIdNumber,
       'deceasedPhotoUrl': deceasedPhotoUrl,
       'causeOfDeath': causeOfDeath,
-      'dateOfDeath': dateOfDeath != null ? Timestamp.fromDate(dateOfDeath!) : null,
+      'dateOfDeath': dateOfDeath != null
+          ? Timestamp.fromDate(dateOfDeath!)
+          : null,
       'deathCertificateUrl': deathCertificateUrl,
 
       // بيانات المعيل
@@ -344,7 +345,9 @@ String get orphanFatherFullName =>
       'sponsorshipStatus': sponsorshipStatus,
       'sponsorshipAmount': sponsorshipAmount,
       'sponsorshipType': sponsorshipType,
-      'sponsorshipDate': sponsorshipDate != null ? Timestamp.fromDate(sponsorshipDate!) : null,
+      'sponsorshipDate': sponsorshipDate != null
+          ? Timestamp.fromDate(sponsorshipDate!)
+          : null,
 
       // ملاحظات
       'notes': notes,
@@ -372,6 +375,7 @@ String get orphanFatherFullName =>
       familyName: _asString(map['familyName']) ?? '',
 
       // المعلومات الشخصية
+      
       orphanIdNumber: _asInt(map['orphanIdNumber']) ?? 0,
       dateOfBirth: _asDate(map['dateOfBirth']) ?? DateTime(2000, 1, 1),
       gender: _asString(map['gender']) ?? '',
@@ -571,7 +575,8 @@ String get orphanFatherFullName =>
       // بيانات المعيل
       breadwinnerFullName: breadwinnerFullName ?? this.breadwinnerFullName,
       breadwinnerIdNumber: breadwinnerIdNumber ?? this.breadwinnerIdNumber,
-      breadwinnerIdPhotoUrl: breadwinnerIdPhotoUrl ?? this.breadwinnerIdPhotoUrl,
+      breadwinnerIdPhotoUrl:
+          breadwinnerIdPhotoUrl ?? this.breadwinnerIdPhotoUrl,
       breadwinnerKinship: breadwinnerKinship ?? this.breadwinnerKinship,
       breadwinnerMaritalStatus:
           breadwinnerMaritalStatus ?? this.breadwinnerMaritalStatus,

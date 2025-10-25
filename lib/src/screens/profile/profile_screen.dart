@@ -5,6 +5,8 @@ import '../../blocs/profile/profile_bloc.dart';
 import 'edit_profile_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
+  static const routeName = '/profile_screen';
+
   const ProfileScreen({super.key});
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();

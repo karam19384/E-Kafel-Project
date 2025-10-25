@@ -1,4 +1,5 @@
 // lib/src/screens/home_screen.dart
+import 'package:e_kafel/src/utils/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:e_kafel/src/blocs/auth/auth_bloc.dart';
@@ -251,8 +252,9 @@ class _HomeScreenState extends State<HomeScreen> {
       return Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.grey[50],
+          // color: AppColors.lightGreen,
           borderRadius: BorderRadius.circular(16),
+          border: Border.all(width: 0.5 ,color: AppColors.greyText),
         ),
         child: Column(
           children: [
@@ -444,9 +446,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             children: [
                               // Header
                               Container(
-                                padding: const EdgeInsets.fromLTRB(24, 60, 24, 20),
+                                padding: const EdgeInsets.fromLTRB(24, 50, 24, 20),
                                 decoration: const BoxDecoration(
-                                  color: Color(0xFF6DAF97),
+                                  color: AppColors.primaryColor,
                                   borderRadius: BorderRadius.vertical(
                                     bottom: Radius.circular(30),
                                   ),
@@ -462,10 +464,10 @@ class _HomeScreenState extends State<HomeScreen> {
                                           onTap: () => _scaffoldKey.currentState
                                               ?.openDrawer(),
                                           child: const CircleAvatar(
-                                            backgroundColor: Colors.white,
+                                            backgroundColor: AppColors.lightGreen,
                                             child: Icon(
                                               Icons.menu,
-                                              color: Color(0xFF6DAF97),
+                                              color: AppColors.primaryColor,
                                             ),
                                           ),
                                         ),
@@ -518,7 +520,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                     ),
                                     const SizedBox(height: 20),
 
-                                    // Progress Card
                                     Card(
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(20),
@@ -527,7 +528,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                       child: Container(
                                         padding: const EdgeInsets.all(20),
                                         decoration: BoxDecoration(
-                                          color: Colors.white,
+                                        color: AppColors.lightGreen,
                                           borderRadius: BorderRadius.circular(20),
                                         ),
                                         child: Row(
@@ -638,7 +639,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                             onTap: () {
                                               Navigator.pushNamed(
                                                 context,
-                                                '/orphans_archive_list_screen',
+                                                '/orphan_archive_list_screen',
                                                 arguments: {
                                                   'institutionId':
                                                       state.institutionId,
@@ -698,7 +699,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                             color: const Color(0xFFF44336),
                                             icon: Icons.supervisor_account,
                                             onTap: () {
-                                              // إصلاح: تمرير kafalaHeadId الصحيح (كان يُمرَّر userRole بالغلط)
                                               Navigator.push(
                                                 context,
                                                 MaterialPageRoute(
@@ -911,6 +911,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 (route) => false,
               );
             },
+            
           );
         }
         return AppDrawer(

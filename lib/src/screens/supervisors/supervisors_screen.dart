@@ -33,7 +33,6 @@ class _SupervisorsScreenState extends State<SupervisorsScreen> {
     final isHead =
         auth is AuthAuthenticated && auth.userRole == 'kafala_head';
     if (!isHead) {
-      // لا تملك صلاحية
       WidgetsBinding.instance.addPostFrameCallback((_) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('لا تملك صلاحية للوصول إلى المشرفين')),

@@ -1,4 +1,5 @@
 import 'package:e_kafel/src/models/orphan_model.dart';
+import 'package:e_kafel/src/screens/sms/send_sms_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
@@ -10,13 +11,17 @@ import '../../blocs/orphans/orphans_bloc.dart';
 import '../Auth/login_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'edit_orphan_details_screen.dart';
+import 'package:e_kafel/src/utils/app_colors.dart';
 
 class OrphanDetailsScreen extends StatefulWidget {
   static const routeName = '/orphan_details_screen';
-
-  final String orphanId; // docId
+  final String orphanId;
   final String institutionId;
-  const OrphanDetailsScreen({super.key, required this.orphanId, required this.institutionId});
+  const OrphanDetailsScreen({
+    super.key,
+    required this.orphanId,
+    required this.institutionId,
+  });
 
   @override
   State<OrphanDetailsScreen> createState() => _OrphanDetailsScreenState();
@@ -27,6 +32,7 @@ class _OrphanDetailsScreenState extends State<OrphanDetailsScreen> {
   Map<String, dynamic>? orphanData;
   bool _isLoading = true;
   String? _errorMessage;
+  String? _orphanPhotoUrl;
 
   @override
   void initState() {
@@ -44,7 +50,8 @@ class _OrphanDetailsScreenState extends State<OrphanDetailsScreen> {
       if (docSnapshot.exists) {
         setState(() {
           orphanData = docSnapshot.data();
-          orphanData!['id'] = docSnapshot.id; // نخزن docId مع البيانات
+          orphanData!['id'] = docSnapshot.id;
+          _orphanPhotoUrl = orphanData!['orphanPhotoUrl'];
           _isLoading = false;
         });
       } else {
@@ -62,8 +69,12 @@ class _OrphanDetailsScreenState extends State<OrphanDetailsScreen> {
   }
 
   void _sendSMS() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('سيتم إرسال رسالة نصية قريباً.')),
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SendSMSScreen(
+          recipientNumber: _safeString(orphanData!['mobileNumber']),
+        ),
+      ),
     );
   }
 
@@ -71,17 +82,25 @@ class _OrphanDetailsScreenState extends State<OrphanDetailsScreen> {
     final bool? shouldArchive = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('تأكيد الأرشفة'),
-        content: const Text('هل أنت متأكد من أرشفة هذا اليتيم؟'),
+        title: Text(
+          'تأكيد الأرشفة',
+          style: TextStyle(color: AppColors.primaryColor),
+        ),
+        content: Text('هل أنت متأكد من أرشفة هذا اليتيم؟'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('إلغاء'),
+            child: Text(
+              'إلغاء',
+              style: TextStyle(color: AppColors.secondaryColor),
+            ),
           ),
           ElevatedButton(
             onPressed: () => Navigator.of(context).pop(true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('أرشفة'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.errorColor,
+            ),
+            child: Text('أرشفة', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -89,43 +108,171 @@ class _OrphanDetailsScreenState extends State<OrphanDetailsScreen> {
 
     if (shouldArchive == true) {
       context.read<OrphansBloc>().add(
-        ArchiveOrphan(orphanId: widget.orphanId, institutionId: widget.institutionId),
+        ArchiveOrphan(
+          orphanId: widget.orphanId,
+          institutionId: widget.institutionId,
+        ),
       );
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('تم أرشفة اليتيم بنجاح!')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('تم أرشفة اليتيم بنجاح!'),
+          backgroundColor: AppColors.successColor,
+        ),
+      );
 
       Navigator.of(context).pop();
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('تفاصيل اليتيم'),
-        centerTitle: true,
-        backgroundColor: const Color(0xFF4C7F7F),
+  Widget _buildInfoCard(String title, List<Widget> children) {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.info_outline,
+                  color: AppColors.primaryColor,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primaryColor,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12), // زيادة المسافة بدلاً من الديفايدر
+            ...children,
+          ],
+        ),
       ),
-      drawer: _buildDrawer(),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _errorMessage != null
-          ? Center(child: Text(_errorMessage!))
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _buildActionButtons(),
-                  const SizedBox(height: 20),
-                  _buildDetailsCard(),
-                  const SizedBox(height: 20),
-                  _buildFilesCard(),
+    );
+  }
+
+  Widget _buildDetailItem(String label, String value, {IconData? icon}) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12), // زيادة المسافة بين العناصر
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            flex: 2,
+            child: Row(
+              children: [
+                if (icon != null) ...[
+                  Icon(icon, size: 16, color: AppColors.secondaryColor),
+                  const SizedBox(width: 6),
+                ],
+                Text(
+                  '$label:',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                    color: AppColors.secondaryColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8), // تقليل المسافة بين العمودين
+          Expanded(
+            flex: 3,
+            child: Text(
+              value,
+              style: TextStyle(fontSize: 13, color: AppColors.textColor),
+              textAlign: TextAlign.start,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOrphanHeader() {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          children: [
+            // صورة اليتيم
+            Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.primaryColor, width: 3),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.3),
+                    blurRadius: 10,
+                    offset: const Offset(0, 5),
+                  ),
                 ],
               ),
+              child: ClipOval(
+                child: _orphanPhotoUrl != null && _orphanPhotoUrl!.isNotEmpty
+                    ? Image.network(
+                        _orphanPhotoUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            color: Colors.grey[200],
+                            child: Icon(
+                              Icons.person,
+                              size: 50,
+                              color: Colors.grey[400],
+                            ),
+                          );
+                        },
+                      )
+                    : Container(
+                        color: Colors.grey[200],
+                        child: Icon(
+                          Icons.person,
+                          size: 50,
+                          color: Colors.grey[400],
+                        ),
+                      ),
+              ),
             ),
+            const SizedBox(height: 16),
+
+            // اسم اليتيم ورقمه
+            Text(
+              _safeString(orphanData!['orphanName'], defaultValue: 'غير معروف'),
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: AppColors.primaryColor,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'رقم اليتيم: ${_safeString(orphanData!['orphanNo'])}',
+              style: TextStyle(fontSize: 14, color: AppColors.secondaryColor),
+            ),
+            const SizedBox(height: 16),
+
+            // الأزرار الثلاثة
+            _buildActionButtons(),
+          ],
+        ),
+      ),
     );
   }
 
@@ -136,7 +283,7 @@ class _OrphanDetailsScreenState extends State<OrphanDetailsScreen> {
         _buildActionButton(
           icon: Icons.edit,
           label: 'تعديل',
-          color: Colors.blue,
+          color: AppColors.primaryColor,
           onPressed: () {
             Navigator.of(context).push(
               MaterialPageRoute(
@@ -152,13 +299,13 @@ class _OrphanDetailsScreenState extends State<OrphanDetailsScreen> {
         _buildActionButton(
           icon: Icons.sms,
           label: 'رسالة',
-          color: const Color(0xFFE0BBE4),
+          color: AppColors.accentColor,
           onPressed: _sendSMS,
         ),
         _buildActionButton(
           icon: Icons.archive,
           label: 'أرشفة',
-          color: Colors.red,
+          color: AppColors.errorColor,
           onPressed: _archiveOrphan,
         ),
       ],
@@ -173,246 +320,377 @@ class _OrphanDetailsScreenState extends State<OrphanDetailsScreen> {
   }) {
     return Column(
       children: [
-        ElevatedButton(
-          onPressed: onPressed,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: color,
-            shape: const CircleBorder(),
-            padding: const EdgeInsets.all(15),
-            elevation: 3,
+        Container(
+          width: 50,
+          height: 50,
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: color, width: 2),
           ),
-          child: Icon(icon, color: Colors.white, size: 28),
+          child: IconButton(
+            onPressed: onPressed,
+            icon: Icon(icon, color: color, size: 24),
+            padding: EdgeInsets.zero,
+          ),
         ),
-        const SizedBox(height: 5),
+        const SizedBox(height: 6),
         Text(
           label,
-          style: const TextStyle(
-            fontSize: 12,
+          style: TextStyle(
+            fontSize: 11,
             fontWeight: FontWeight.bold,
-            color: Color(0xFF4C7F7F),
+            color: color,
           ),
+          textAlign: TextAlign.center,
         ),
       ],
     );
   }
 
-  Widget _buildDetailsCard() {
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'بيانات اليتيم',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF4C7F7F),
-              ),
-            ),
-            const Divider(),
-            _buildDetailRow(
-              label: 'رقم اليتيم',
-              value: _safeString(orphanData!['orphanNo']),
-            ),
-            _buildDetailRow(
-              label: 'الاسم الكامل',
-              value: _safeString(orphanData!['name']),
-            ),
-            _buildDetailRow(
-              label: 'الرقم الوطني',
-              value: _safeString(orphanData!['orphanIdNumber']),
-            ),
-            _buildDetailRow(
-              label: 'تاريخ الميلاد',
-              value: _formatDate(orphanData!['dateOfBirth']),
-            ),
-            _buildDetailRow(
-              label: 'الجنس',
-              value: _safeString(orphanData!['gender']),
-            ),
-            _buildDetailRow(
-              label: 'اسم الأم',
-              value: _safeString(orphanData!['motherName']),
-            ),
-            _buildDetailRow(
-              label: 'الرقم الوطني للأم',
-              value: _safeString(orphanData!['motherIdNumber']),
-            ),
-            _buildDetailRow(
-              label: 'اسم المعيل',
-              value: _safeString(orphanData!['breadwinnerName']),
-            ),
-            _buildDetailRow(
-              label: 'الرقم الوطني للمعيل',
-              value: _safeString(orphanData!['breadwinnerIdNumber']),
-            ),
-            _buildDetailRow(
-              label: 'حالة المعيل الاجتماعية',
-              value: _safeString(orphanData!['breadwinnerMaritalStatus']),
-            ),
-            _buildDetailRow(
-              label: 'صلة القرابة بالمعيل',
-              value: _safeString(orphanData!['breadwinnerKinship']),
-            ),
-            _buildDetailRow(
-              label: 'اسم المتوفى',
-              value: _safeString(orphanData!['deceasedName']),
-            ),
-            _buildDetailRow(
-              label: 'الرقم الوطني للمتوفى',
-              value: _safeString(orphanData!['deceasedIdNumber']),
-            ),
-            _buildDetailRow(
-              label: 'تاريخ الوفاة',
-              value: _formatDate(orphanData!['dateOfDeath']),
-            ),
-            _buildDetailRow(
-              label: 'سبب الوفاة',
-              value: _safeString(orphanData!['causeOfDeath']),
-            ),
-            _buildDetailRow(
-              label: 'المحافظة',
-              value: _safeString(orphanData!['governorate']),
-            ),
-            _buildDetailRow(
-              label: 'المدينة',
-              value: _safeString(orphanData!['city']),
-            ),
-            _buildDetailRow(
-              label: 'الحي',
-              value: _safeString(orphanData!['neighborhood']),
-            ),
-            _buildDetailRow(
-              label: 'رقم الهاتف',
-              value: _safeString(orphanData!['mobileNumber']),
-            ),
-            _buildDetailRow(
-              label: 'رقم الأرضي',
-              value: _safeString(orphanData!['mobileNumber']),
-            ),
-            _buildDetailRow(
-              label: 'عدد الذكور',
-              value: _safeString(
-                orphanData!['numberOfMales'],
-                defaultValue: '0',
-              ),
-            ),
-            _buildDetailRow(
-              label: 'عدد الإناث',
-              value: _safeString(
-                orphanData!['numberOfFemales'],
-                defaultValue: '0',
-              ),
-            ),
-            _buildDetailRow(
-              label: 'إجمالي أفراد العائلة',
-              value: _safeString(
-                orphanData!['totalFamilyMembers'],
-                defaultValue: '0',
-              ),
-            ),
-            _buildDetailRow(
-              label: 'اسم المدرسة',
-              value: _safeString(orphanData!['schoolName']),
-            ),
-            _buildDetailRow(
-              label: 'الصف',
-              value: _safeString(orphanData!['grade']),
-            ),
-            _buildDetailRow(
-              label: 'المستوى التعليمي',
-              value: _safeString(orphanData!['educationLevel']),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFilesCard() {
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'الملفات المرفقة',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF4C7F7F),
-              ),
-            ),
-            const Divider(),
-            _buildFileRow(label: 'صورة الهوية', url: orphanData!['idCardUrl']),
-            _buildFileRow(
-              label: 'شهادة الوفاة',
-              url: orphanData!['deathCertificateUrl'],
-            ),
-            _buildFileRow(
-              label: 'صورة شخصية',
-              url: orphanData!['orphanPhotoUrl'],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDetailRow({required String label, required String value}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            flex: 2,
-            child: Text(
-              '$label:',
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-                color: Color(0xFF4C7F7F),
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            flex: 3,
-            child: Text(
-              value,
-              style: const TextStyle(fontSize: 16, color: Color(0xFF4C7F7F)),
-            ),
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('تفاصيل اليتيم', style: TextStyle(color: Colors.white)),
+        centerTitle: true,
+        backgroundColor: AppColors.primaryColor,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: Icon(Icons.refresh, color: Colors.white),
+            onPressed: _fetchOrphanDetails,
           ),
         ],
       ),
+      drawer: _buildDrawer(),
+      body: _isLoading
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(color: AppColors.primaryColor),
+                  const SizedBox(height: 16),
+                  Text(
+                    'جاري تحميل البيانات...',
+                    style: TextStyle(color: AppColors.secondaryColor),
+                  ),
+                ],
+              ),
+            )
+          : _errorMessage != null
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    size: 64,
+                    color: AppColors.errorColor,
+                  ),
+                  const SizedBox(height: 16),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Text(
+                      _errorMessage!,
+                      style: TextStyle(color: AppColors.errorColor),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  ElevatedButton(
+                    onPressed: _fetchOrphanDetails,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryColor,
+                    ),
+                    child: Text(
+                      'إعادة المحاولة',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // رأس الصفحة - الصورة والأزرار
+                  _buildOrphanHeader(),
+
+                  // بطاقة المعلومات الأساسية
+                  _buildInfoCard('المعلومات الأساسية', [
+                    _buildDetailItem(
+                      'إسم اليتيم',
+                      _formatDate(_safeString(orphanData!['orphanFullName'])),
+                      icon: Icons.person,
+                    ),
+                     _buildDetailItem(
+                      'معرف اليتيم',
+                      _formatDate(_safeString(orphanData!['orphanNo'])),
+                      icon: Icons.numbers,
+                    ),
+                    _buildDetailItem(
+                      'الرقم الوطني',
+                      _safeString(orphanData!['orphanIdNumber']),
+                      icon: Icons.badge,
+                    ),
+                    _buildDetailItem(
+                      'تاريخ الميلاد',
+                      _formatDate(orphanData!['dateOfBirth']),
+                      icon: Icons.cake,
+                    ),
+                    _buildDetailItem(
+                      'الجنس',
+                      _safeString(orphanData!['gender']),
+                      icon: Icons.people,
+                    ),
+                    _buildDetailItem(
+                      'العمر',
+                      _calculateAge(orphanData!['dateOfBirth']),
+                      icon: Icons.calendar_today,
+                    ),
+                  ]),
+
+                  // بطاقة معلومات الأم
+                  _buildInfoCard('معلومات الأم', [
+                    _buildDetailItem(
+                      'اسم الأم',
+                      _safeString(orphanData!['motherFullName']),
+                      icon: Icons.woman,
+                    ),
+                    _buildDetailItem(
+                      'الرقم الوطني للأم',
+                      _safeString(orphanData!['motherIdNumber']),
+                      icon: Icons.badge,
+                    ),
+                    _buildDetailItem(
+                      ' عمر الأم',
+                      _safeString(orphanData!['motherAge']),
+                      icon: Icons.phone,
+                    ),
+                    
+                  ]),
+
+                  // بطاقة معلومات المعيل
+                  _buildInfoCard('معلومات المعيل', [
+                    _buildDetailItem(
+                      'اسم المعيل',
+                      _safeString(orphanData!['deceasedFullName']),
+                      icon: Icons.person,
+                    ),
+                    _buildDetailItem(
+                      'الرقم الوطني للمعيل',
+                      _safeString(orphanData!['breadwinnerIdNumber']),
+                      icon: Icons.badge,
+                    ),
+                    _buildDetailItem(
+                      'حالة المعيل الاجتماعية',
+                      _safeString(orphanData!['breadwinnerMaritalStatus']),
+                      icon: Icons.family_restroom,
+                    ),
+                    _buildDetailItem(
+                      'صلة القرابة بالمعيل',
+                      _safeString(orphanData!['breadwinnerKinship']),
+                      icon: Icons.people_alt,
+                    ),
+                  ]),
+
+                  // بطاقة معلومات المتوفى
+                  _buildInfoCard('معلومات المتوفى', [
+                    _buildDetailItem(
+                      'اسم المتوفى',
+                      _safeString(orphanData!['deceasedFullName']),
+                      icon: Icons.person_off,
+                    ),
+                    _buildDetailItem(
+                      'الرقم الوطني للمتوفى',
+                      _safeString(orphanData!['deceasedIdNumber']),
+                      icon: Icons.badge,
+                    ),
+                    _buildDetailItem(
+                      'تاريخ الوفاة',
+                      _formatDate(orphanData!['dateOfDeath']),
+                      icon: Icons.event,
+                    ),
+                    _buildDetailItem(
+                      'سبب الوفاة',
+                      _safeString(orphanData!['causeOfDeath']),
+                      icon: Icons.medical_services,
+                    ),
+                  ]),
+
+                  // بطاقة المعلومات الجغرافية
+                  _buildInfoCard('المعلومات الجغرافية', [
+                    _buildDetailItem(
+                      'المحافظة',
+                      _safeString(orphanData!['governorate']),
+                      icon: Icons.location_city,
+                    ),
+                    _buildDetailItem(
+                      'المدينة',
+                      _safeString(orphanData!['city']),
+                      icon: Icons.location_on,
+                    ),
+                    _buildDetailItem(
+                      'الحي',
+                      _safeString(orphanData!['neighborhood']),
+                      icon: Icons.home,
+                    ),
+                    _buildDetailItem(
+                      'رقم الهاتف',
+                      _safeString(orphanData!['mobileNumber']),
+                      icon: Icons.phone,
+                    ),
+                  ]),
+
+                  // بطاقة المعلومات الأسرية
+                  _buildInfoCard('المعلومات الأسرية', [
+                    _buildDetailItem(
+                      'عدد الذكور',
+                      _safeString(
+                        orphanData!['numberOfMales'],
+                        defaultValue: '0',
+                      ),
+                      icon: Icons.man,
+                    ),
+                    _buildDetailItem(
+                      'عدد الإناث',
+                      _safeString(
+                        orphanData!['numberOfFemales'],
+                        defaultValue: '0',
+                      ),
+                      icon: Icons.woman,
+                    ),
+                    _buildDetailItem(
+                      'إجمالي أفراد العائلة',
+                      _safeString(
+                        orphanData!['totalFamilyMembers'],
+                        defaultValue: '0',
+                      ),
+                      icon: Icons.people,
+                    ),
+                    _buildDetailItem(
+                      'ملكية السكن',
+                      _safeString(orphanData!['housingOwnership']),
+                      icon: Icons.house,
+                    ),
+                  ]),
+
+                  // بطاقة المعلومات التعليمية
+                  _buildInfoCard('المعلومات التعليمية', [
+                    _buildDetailItem(
+                      'اسم المدرسة',
+                      _safeString(orphanData!['schoolName']),
+                      icon: Icons.school,
+                    ),
+                    _buildDetailItem(
+                      'الصف',
+                      _safeString(orphanData!['grade']),
+                      icon: Icons.grade,
+                    ),
+                    _buildDetailItem(
+                      'المستوى التعليمي',
+                      _safeString(orphanData!['educationLevel']),
+                      icon: Icons.school,
+                    ),
+                    _buildDetailItem(
+                      'الحالة التعليمية',
+                      _safeString(orphanData!['educationStatus']),
+                      icon: Icons.book,
+                    ),
+                  ]),
+
+                  // بطاقة المعلومات الصحية
+                  _buildInfoCard('المعلومات الصحية', [
+                    _buildDetailItem(
+                      'الحالة الصحية',
+                      _safeString(orphanData!['healthCondition']),
+                      icon: Icons.health_and_safety,
+                    ),
+                    _buildDetailItem(
+                      'الأمراض المزمنة',
+                      _safeString(orphanData!['chronicDiseases']),
+                      icon: Icons.medical_services,
+                    ),
+                    _buildDetailItem(
+                      'الإعاقات',
+                      _safeString(orphanData!['disabilities']),
+                      icon: Icons.accessible,
+                    ),
+                  ]),
+
+                  // بطاقة معلومات الكفالة
+                  _buildInfoCard('معلومات الكفالة', [
+                    _buildDetailItem(
+                      'حالة الكفالة',
+                      _safeString(orphanData!['sponsorshipStatus']),
+                      icon: Icons.attach_money,
+                    ),
+                    _buildDetailItem(
+                      'اسم الكافل',
+                      _safeString(orphanData!['sponsorName']),
+                      icon: Icons.person,
+                    ),
+                    _buildDetailItem(
+                      'قيمة الكفالة',
+                      _safeString(orphanData!['sponsorshipAmount']),
+                      icon: Icons.money,
+                    ),
+                  ]),
+
+                  // بطاقة الملفات المرفقة
+                  _buildInfoCard('الملفات المرفقة', [
+                    _buildFileItem(
+                      'صورة الهوية',
+                      orphanData!['idCardUrl'],
+                      icon: Icons.credit_card,
+                    ),
+                    _buildFileItem(
+                      'شهادة الوفاة',
+                      orphanData!['deathCertificateUrl'],
+                      icon: Icons.description,
+                    ),
+                    _buildFileItem(
+                      'شهادة ميلاد',
+                      orphanData!['birthCertificateUrl'],
+                      icon: Icons.cake,
+                    ),
+                  ]),
+
+                  const SizedBox(height: 20),
+                ],
+              ),
+            ),
     );
   }
 
-  Widget _buildFileRow({required String label, required String? url}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
+  Widget _buildFileItem(String label, String? url, {IconData? icon}) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
       child: Row(
         children: [
           Expanded(
             flex: 2,
-            child: Text(
-              '$label:',
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-                color: Color(0xFF4C7F7F),
-              ),
+            child: Row(
+              children: [
+                if (icon != null) ...[
+                  Icon(icon, size: 16, color: AppColors.secondaryColor),
+                  const SizedBox(width: 6),
+                ],
+                Text(
+                  '$label:',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                    color: AppColors.secondaryColor,
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
           Expanded(
             flex: 3,
             child: url != null && url.isNotEmpty
@@ -423,18 +701,40 @@ class _OrphanDetailsScreenState extends State<OrphanDetailsScreen> {
                         await launchUrl(uri);
                       }
                     },
-                    child: const Text(
-                      'عرض الملف',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.blue,
-                        decoration: TextDecoration.underline,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: AppColors.primaryColor),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.visibility,
+                            size: 14,
+                            color: AppColors.primaryColor,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'عرض',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppColors.primaryColor,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   )
-                : const Text(
+                : Text(
                     'لا يوجد',
-                    style: TextStyle(fontSize: 16, color: Color(0xFF4C7F7F)),
+                    style: TextStyle(fontSize: 13, color: Colors.grey),
                   ),
           ),
         ],
@@ -449,8 +749,32 @@ class _OrphanDetailsScreenState extends State<OrphanDetailsScreen> {
     return 'غير متوفر';
   }
 
+  String _calculateAge(dynamic date) {
+    try {
+      DateTime birthDate;
+      if (date is Timestamp) {
+        birthDate = date.toDate();
+      } else if (date is DateTime) {
+        birthDate = date;
+      } else {
+        return 'غير معروف';
+      }
+
+      DateTime now = DateTime.now();
+      int age = now.year - birthDate.year;
+      if (now.month < birthDate.month ||
+          (now.month == birthDate.month && now.day < birthDate.day)) {
+        age--;
+      }
+      return '$age سنة';
+    } catch (e) {
+      return 'غير معروف';
+    }
+  }
+
   String _safeString(dynamic value, {String defaultValue = 'غير متوفر'}) {
     if (value == null) return defaultValue;
+    if (value.toString().isEmpty) return defaultValue;
     return value.toString();
   }
 
@@ -479,7 +803,7 @@ class _OrphanDetailsScreenState extends State<OrphanDetailsScreen> {
         return AppDrawer(
           institutionId: '',
           kafalaHeadId: '',
-          userName: 'Loading...',
+          userName: 'جاري التحميل...',
           userRole: '...',
           profileImageUrl: '',
           orphanCount: 0,

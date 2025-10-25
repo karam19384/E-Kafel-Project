@@ -38,7 +38,9 @@ class _SplashScreenState extends State<SplashScreen> {
             );
           }
         },
-        child: const Center(child: CircularProgressIndicator()),
+        child: Center(
+          child: Image(image: AssetImage('assets/images/logo.png'),),
+        ),
       ),
     );
   }

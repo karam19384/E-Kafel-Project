@@ -118,39 +118,42 @@ class FirestoreService {
         .toList();
   }
 
-
-
-// استبدل هذه الدالة (لا تحذف نهائياً من Firestore):
-Future<void> removeSupervisor(String uid) async {
-  // ممنوع الحذف — سنكتفي بتعطيل الحساب
-  await _firestore.collection('users').doc(uid).update({
-    'isActive': false,
-    'updatedAt': FieldValue.serverTimestamp(),
-  });
-}
-
-// أضِف:
-Future<void> toggleSupervisorActive(String uid, bool isActive) async {
-  await _firestore.collection('users').doc(uid).update({
-    'isActive': isActive,
-    'updatedAt': FieldValue.serverTimestamp(),
-  });
-}
-
-// عدّل listSupervisors ليقبل kafalaHeadId ويُفلتر:
-Future<List<UserModel>> listSupervisors(String institutionId, {String? kafalaHeadId}) async {
-  Query<Map<String, dynamic>> q = _firestore
-      .collection('users')
-      .where('institutionId', isEqualTo: institutionId)
-      .where('userRole', isEqualTo: 'supervisor');
-
-  if (kafalaHeadId != null && kafalaHeadId.isNotEmpty) {
-    q = q.where('kafalaHeadId', isEqualTo: kafalaHeadId);
+  // استبدل هذه الدالة (لا تحذف نهائياً من Firestore):
+  Future<void> removeSupervisor(String uid) async {
+    // ممنوع الحذف — سنكتفي بتعطيل الحساب
+    await _firestore.collection('users').doc(uid).update({
+      'isActive': false,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
   }
 
-  final snap = await q.get();
-  return snap.docs.map((d) => UserModel.fromMap({...d.data(), 'uid': d.id})).toList();
-}
+  // أضِف:
+  Future<void> toggleSupervisorActive(String uid, bool isActive) async {
+    await _firestore.collection('users').doc(uid).update({
+      'isActive': isActive,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  // عدّل listSupervisors ليقبل kafalaHeadId ويُفلتر:
+  Future<List<UserModel>> listSupervisors(
+    String institutionId, {
+    String? kafalaHeadId,
+  }) async {
+    Query<Map<String, dynamic>> q = _firestore
+        .collection('users')
+        .where('institutionId', isEqualTo: institutionId)
+        .where('userRole', isEqualTo: 'supervisor');
+
+    if (kafalaHeadId != null && kafalaHeadId.isNotEmpty) {
+      q = q.where('kafalaHeadId', isEqualTo: kafalaHeadId);
+    }
+
+    final snap = await q.get();
+    return snap.docs
+        .map((d) => UserModel.fromMap({...d.data(), 'uid': d.id}))
+        .toList();
+  }
 
 
   // ====================== المستخدمون (موحّد) ======================
@@ -175,27 +178,31 @@ Future<List<UserModel>> listSupervisors(String institutionId, {String? kafalaHea
     }
   }
 
-// في firestore_service.dart
-Future<Map<String, dynamic>?> getInstitutionData(String institutionId) async {
-  try {
-    final doc = await _firestore.collection('institutions').doc(institutionId).get();
-    if (!doc.exists) return null;
-    return doc.data();
-  } catch (e) {
-    debugPrint('Error getting institution data: $e');
-    return null;
+  // في firestore_service.dart
+  Future<Map<String, dynamic>?> getInstitutionData(String institutionId) async {
+    try {
+      final doc = await _firestore
+          .collection('institutions')
+          .doc(institutionId)
+          .get();
+      if (!doc.exists) return null;
+      return doc.data();
+    } catch (e) {
+      debugPrint('Error getting institution data: $e');
+      return null;
+    }
   }
-}
 
-Future<String> getInstitutionName(String institutionId) async {
-  try {
-    final data = await getInstitutionData(institutionId);
-    return data?['institutionName'] as String? ?? 'غير محدد';
-  } catch (e) {
-    debugPrint('Error getting institution name: $e');
-    return 'غير محدد';
+  Future<String> getInstitutionName(String institutionId) async {
+    try {
+      final data = await getInstitutionData(institutionId);
+      return data?['institutionName'] as String? ?? 'غير محدد';
+    } catch (e) {
+      debugPrint('Error getting institution name: $e');
+      return 'غير محدد';
+    }
   }
-}
+
   Future<Map<String, dynamic>?> findUserByUniqueNumber(String unique) async {
     try {
       // users
@@ -358,19 +365,52 @@ Future<String> getInstitutionName(String institutionId) async {
 
   // ====================== الإعدادات ======================
 
+  // دالة للحصول على إعدادات المستخدم
   Future<SettingsModel?> getSettings(String userId) async {
-    final doc = await _firestore.collection('settings').doc(userId).get();
-    if (!doc.exists || doc.data() == null) return null;
-    return SettingsModel.fromMap(doc.data()!);
+    try {
+      final doc = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('settings')
+          .doc('app_settings')
+          .get();
+
+      if (doc.exists) {
+        return SettingsModel.fromMap(doc.data()!);
+      }
+      return null;
+    } catch (e) {
+      throw Exception('فشل تحميل الإعدادات: $e');
+    }
   }
 
+  // دالة لحفظ إعدادات المستخدم
   Future<void> saveSettings(String userId, SettingsModel settings) async {
-    await _firestore
-        .collection('settings')
-        .doc(userId)
-        .set(settings.toMap(), SetOptions(merge: true));
+    try {
+      await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('settings')
+          .doc('app_settings')
+          .set(settings.toMap());
+    } catch (e) {
+      throw Exception('فشل حفظ الإعدادات: $e');
+    }
   }
 
+  // دالة لتحديث إعداد محدد
+  Future<void> updateSetting(String userId, String key, dynamic value) async {
+    try {
+      await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('settings')
+          .doc('app_settings')
+          .update({key: value});
+    } catch (e) {
+      throw Exception('فشل تحديث الإعداد: $e');
+    }
+  }
   // ====================== المؤسسات ======================
 
   Future<void> initializeNewInstitution(
@@ -425,25 +465,26 @@ Future<String> getInstitutionName(String institutionId) async {
 
   // ====================== المشرفون ======================
 
- Future<String?> createSupervisorWithAuth({
-  required Map<String, dynamic> supervisorData,
-  required String password,
-}) async {
-  try {
-    final authService = AuthService();
-    
-    // استخدام الدالة الصحيحة من AuthService
-    final uid = await authService.createSupervisorAccount(
-      supervisorData: supervisorData,
-      password: password,
-    );
-    
-    return uid;
-  } catch (e) {
-    debugPrint('Error creating supervisor with auth: $e');
-    rethrow;
+  Future<String?> createSupervisorWithAuth({
+    required Map<String, dynamic> supervisorData,
+    required String password,
+  }) async {
+    try {
+      final authService = AuthService();
+
+      // استخدام الدالة الصحيحة من AuthService
+      final uid = await authService.createSupervisorAccount(
+        supervisorData: supervisorData,
+        password: password,
+      );
+
+      return uid;
+    } catch (e) {
+      debugPrint('Error creating supervisor with auth: $e');
+      rethrow;
+    }
   }
-}
+
   // دالة مساعدة لإنشاء مستخدم مع مصادقة
   Future<String> createUserWithEmailAndPassword({
     required String email,
@@ -487,8 +528,8 @@ Future<String> getInstitutionName(String institutionId) async {
     final map = {...doc.data()!, 'uid': doc.id};
     return UserModel.fromMap(map);
   }
-    
-     Future<List<UserModel>> searchSupervisors({
+
+  Future<List<UserModel>> searchSupervisors({
     required String institutionId,
     String? search,
     String? userRole, // استخدم userRole لو متاح
@@ -534,8 +575,9 @@ Future<String> getInstitutionName(String institutionId) async {
 
     return list;
   }
-// ====================== الإشعارات ======================
- // ===== إشعارات موجهة للمستخدم =====
+
+  // ====================== الإشعارات ======================
+  // ===== إشعارات موجهة للمستخدم =====
   Future<void> notifyUser({
     required String userId,
     required String title,
@@ -553,8 +595,6 @@ Future<String> getInstitutionName(String institutionId) async {
       ...?extra,
     });
   }
-
-
 
   // ===== جلب مشرفين لرئيس قسم معيّن =====
   Future<List<Map<String, dynamic>>> listSupervisorsByHead({
@@ -588,179 +628,185 @@ Future<String> getInstitutionName(String institutionId) async {
         ? data['fullName'] as String
         : '—';
   }
-/// تحميل إشعارات مستخدم مع ترقيم صفحات (Page Size افتراضي = 20)
-Future<List<Map<String, dynamic>>> getNotificationsPage(
-  String uid, {
-  int limit = 20,
-  DocumentSnapshot<Map<String, dynamic>>? startAfter,
-}) async {
-  try {
-    Query<Map<String, dynamic>> q = _firestore
-        .collection('notifications')
-        .where('userId', isEqualTo: uid)
-        .orderBy('timestamp', descending: true)
-        .limit(limit);
 
-    if (startAfter != null) {
-      q = q.startAfterDocument(startAfter);
-    }
+  /// تحميل إشعارات مستخدم مع ترقيم صفحات (Page Size افتراضي = 20)
+  Future<List<Map<String, dynamic>>> getNotificationsPage(
+    String uid, {
+    int limit = 20,
+    DocumentSnapshot<Map<String, dynamic>>? startAfter,
+  }) async {
+    try {
+      Query<Map<String, dynamic>> q = _firestore
+          .collection('notifications')
+          .where('userId', isEqualTo: uid)
+          .orderBy('timestamp', descending: true)
+          .limit(limit);
 
-    final snap = await q.get();
-    return snap.docs.map((d) => {
-      ...d.data(),
-      'notificationId': d.id,
-      '__doc': d, // مفيد لإحضاره كنقطة startAfter لاحقًا
-    }).toList();
-  } catch (e) {
-    debugPrint('Error getNotificationsPage: $e');
-    return [];
-  }
-}
-
-/// نسخة بسيطة بدون ترقيم صفحات (تبقى موجودة إن احتجتها)
-Future<List<Map<String, dynamic>>> getNotifications(String uid) async {
-  try {
-    final snapshot = await _firestore
-        .collection('notifications')
-        .where('userId', isEqualTo: uid)
-        .orderBy('timestamp', descending: true)
-        .limit(100) // لا تجيب كل شيء مرّة واحدة
-        .get();
-
-    return snapshot.docs.map((d) => {
-      ...d.data(),
-      'notificationId': d.id,
-    }).toList();
-  } catch (e) {
-    debugPrint('Error getting notifications: $e');
-    return [];
-  }
-}
-
-/// إنشاء إشعار واحد وإرجاع ID — مع ضمان وجود timestamp و isRead
-Future<String> createNotification(Map<String, dynamic> data) async {
-  final ref = _firestore.collection('notifications').doc();
-  final payload = {
-    ...data,
-    'notificationId': ref.id,
-    'timestamp': data['timestamp'] ?? FieldValue.serverTimestamp(),
-    'isRead': data['isRead'] ?? false,
-  };
-
-  await ref.set(payload);
-  return ref.id;
-}
-
-/// إرسال إشعار لكل مستخدمي مؤسسة معيّنة (Batch + تقطيع لتفادي حد 500)
-Future<List<String>> sendNotificationToInstitution(
-  String institutionId,
-  String title,
-  String message, {
-  String? type,
-  Map<String, dynamic>? extra, // بيانات إضافية لعرض مخصص
-}) async {
-  final createdIds = <String>[];
-  try {
-    final users = await getUsersByInstitution(institutionId);
-    if (users.isEmpty) return createdIds;
-
-    const int batchLimit = 450; // أقل من 500 لسلامة الهامش
-    final chunks = <List<Map<String, dynamic>>>[];
-
-    // قسّم المستخدمين على دفعات
-    for (var i = 0; i < users.length; i += batchLimit) {
-      chunks.add(users.sublist(
-        i,
-        i + batchLimit > users.length ? users.length : i + batchLimit,
-      ));
-    }
-
-    for (final chunk in chunks) {
-      final batch = _firestore.batch();
-
-      for (final user in chunk) {
-        final uid = (user['uid'] ?? user['id'])?.toString() ?? '';
-        if (uid.isEmpty) continue;
-
-        final ref = _firestore.collection('notifications').doc();
-        createdIds.add(ref.id);
-
-        final data = {
-          'notificationId': ref.id,
-          'userId': uid,
-          'title': title,
-          'message': message,
-          'type': type ?? 'general',
-          'institutionId': institutionId,
-          'isRead': false,
-          'timestamp': FieldValue.serverTimestamp(),
-          if (extra != null) ...{'extra': extra},
-        };
-
-        batch.set(ref, data);
+      if (startAfter != null) {
+        q = q.startAfterDocument(startAfter);
       }
 
-      await batch.commit();
+      final snap = await q.get();
+      return snap.docs
+          .map(
+            (d) => {
+              ...d.data(),
+              'notificationId': d.id,
+              '__doc': d, // مفيد لإحضاره كنقطة startAfter لاحقًا
+            },
+          )
+          .toList();
+    } catch (e) {
+      debugPrint('Error getNotificationsPage: $e');
+      return [];
     }
-
-    // (اختياري) نطلق دفع FCM عبر Cloud Function callable بعد الحفظ
-    // جرّب استدعاء دالة HTTPS ترسل Push حسب اليوزر/التوبيك:
-    // await FirebaseFunctions.instanceFor(region: 'us-central1')
-    //   .httpsCallable('notifyInstitutionUsers')
-    //   .call({'institutionId': institutionId, 'title': title, 'body': message, 'type': type ?? 'general'});
-
-    return createdIds;
-  } catch (e) {
-    debugPrint('Error sending notification to institution: $e');
-    return createdIds;
   }
-}
 
-/// وضع إقرأ/غير مقروء لإشعار واحد
-Future<void> markNotificationRead(
-  String notificationId, {
-  bool isRead = true,
-}) async {
-  await _firestore.collection('notifications').doc(notificationId).update({
-    'isRead': isRead,
-    'readAt': isRead ? FieldValue.serverTimestamp() : null,
-  });
-}
+  /// نسخة بسيطة بدون ترقيم صفحات (تبقى موجودة إن احتجتها)
+  Future<List<Map<String, dynamic>>> getNotifications(String uid) async {
+    try {
+      final snapshot = await _firestore
+          .collection('notifications')
+          .where('userId', isEqualTo: uid)
+          .orderBy('timestamp', descending: true)
+          .limit(100) // لا تجيب كل شيء مرّة واحدة
+          .get();
 
-/// تمييز كل إشعارات المستخدم كمقروءة (Batch)
-Future<void> markAllNotificationsReadForUser(String uid) async {
-  try {
-    final q = await _firestore
+      return snapshot.docs
+          .map((d) => {...d.data(), 'notificationId': d.id})
+          .toList();
+    } catch (e) {
+      debugPrint('Error getting notifications: $e');
+      return [];
+    }
+  }
+
+  /// إنشاء إشعار واحد وإرجاع ID — مع ضمان وجود timestamp و isRead
+  Future<String> createNotification(Map<String, dynamic> data) async {
+    final ref = _firestore.collection('notifications').doc();
+    final payload = {
+      ...data,
+      'notificationId': ref.id,
+      'timestamp': data['timestamp'] ?? FieldValue.serverTimestamp(),
+      'isRead': data['isRead'] ?? false,
+    };
+
+    await ref.set(payload);
+    return ref.id;
+  }
+
+  /// إرسال إشعار لكل مستخدمي مؤسسة معيّنة (Batch + تقطيع لتفادي حد 500)
+  Future<List<String>> sendNotificationToInstitution(
+    String institutionId,
+    String title,
+    String message, {
+    String? type,
+    Map<String, dynamic>? extra, // بيانات إضافية لعرض مخصص
+  }) async {
+    final createdIds = <String>[];
+    try {
+      final users = await getUsersByInstitution(institutionId);
+      if (users.isEmpty) return createdIds;
+
+      const int batchLimit = 450; // أقل من 500 لسلامة الهامش
+      final chunks = <List<Map<String, dynamic>>>[];
+
+      // قسّم المستخدمين على دفعات
+      for (var i = 0; i < users.length; i += batchLimit) {
+        chunks.add(
+          users.sublist(
+            i,
+            i + batchLimit > users.length ? users.length : i + batchLimit,
+          ),
+        );
+      }
+
+      for (final chunk in chunks) {
+        final batch = _firestore.batch();
+
+        for (final user in chunk) {
+          final uid = (user['uid'] ?? user['id'])?.toString() ?? '';
+          if (uid.isEmpty) continue;
+
+          final ref = _firestore.collection('notifications').doc();
+          createdIds.add(ref.id);
+
+          final data = {
+            'notificationId': ref.id,
+            'userId': uid,
+            'title': title,
+            'message': message,
+            'type': type ?? 'general',
+            'institutionId': institutionId,
+            'isRead': false,
+            'timestamp': FieldValue.serverTimestamp(),
+            if (extra != null) ...{'extra': extra},
+          };
+
+          batch.set(ref, data);
+        }
+
+        await batch.commit();
+      }
+
+      // (اختياري) نطلق دفع FCM عبر Cloud Function callable بعد الحفظ
+      // جرّب استدعاء دالة HTTPS ترسل Push حسب اليوزر/التوبيك:
+      // await FirebaseFunctions.instanceFor(region: 'us-central1')
+      //   .httpsCallable('notifyInstitutionUsers')
+      //   .call({'institutionId': institutionId, 'title': title, 'body': message, 'type': type ?? 'general'});
+
+      return createdIds;
+    } catch (e) {
+      debugPrint('Error sending notification to institution: $e');
+      return createdIds;
+    }
+  }
+
+  /// وضع إقرأ/غير مقروء لإشعار واحد
+  Future<void> markNotificationRead(
+    String notificationId, {
+    bool isRead = true,
+  }) async {
+    await _firestore.collection('notifications').doc(notificationId).update({
+      'isRead': isRead,
+      'readAt': isRead ? FieldValue.serverTimestamp() : null,
+    });
+  }
+
+  /// تمييز كل إشعارات المستخدم كمقروءة (Batch)
+  Future<void> markAllNotificationsReadForUser(String uid) async {
+    try {
+      final q = await _firestore
+          .collection('notifications')
+          .where('userId', isEqualTo: uid)
+          .where('isRead', isEqualTo: false)
+          .limit(450)
+          .get();
+
+      if (q.docs.isEmpty) return;
+
+      final batch = _firestore.batch();
+      for (final d in q.docs) {
+        batch.update(d.reference, {
+          'isRead': true,
+          'readAt': FieldValue.serverTimestamp(),
+        });
+      }
+      await batch.commit();
+    } catch (e) {
+      debugPrint('markAllNotificationsReadForUser error: $e');
+    }
+  }
+
+  /// ستريم عدّاد غير المقروء (لأيقونة الجرس في الـ AppBar)
+  Stream<int> unreadCountStream(String uid) {
+    return _firestore
         .collection('notifications')
         .where('userId', isEqualTo: uid)
         .where('isRead', isEqualTo: false)
-        .limit(450)
-        .get();
-
-    if (q.docs.isEmpty) return;
-
-    final batch = _firestore.batch();
-    for (final d in q.docs) {
-      batch.update(d.reference, {
-        'isRead': true,
-        'readAt': FieldValue.serverTimestamp(),
-      });
-    }
-    await batch.commit();
-  } catch (e) {
-    debugPrint('markAllNotificationsReadForUser error: $e');
+        .snapshots()
+        .map((s) => s.size);
   }
-}
-
-/// ستريم عدّاد غير المقروء (لأيقونة الجرس في الـ AppBar)
-Stream<int> unreadCountStream(String uid) {
-  return _firestore
-      .collection('notifications')
-      .where('userId', isEqualTo: uid)
-      .where('isRead', isEqualTo: false)
-      .snapshots()
-      .map((s) => s.size);
-}
 
   // ====================== الأيتام (Orphans) ======================
 
@@ -1301,8 +1347,7 @@ Stream<int> unreadCountStream(String uid) {
     final supervisorsBase = _firestore
         .collection('users')
         .where('institutionId', isEqualTo: institutionId)
-        .where('userRole', isEqualTo: 'supervisor')
-        .where('isActive', isEqualTo: true);
+        .where('userRole', isEqualTo: 'supervisor');
 
     // counts
     final totalOrphans = await orphansBase
@@ -1356,6 +1401,8 @@ Stream<int> unreadCountStream(String uid) {
     debugPrint('FirestoreService: Fetched Stats: $stats');
     return stats;
   }
+
+
 
   // ====================== أدوات مساعدة ======================
 

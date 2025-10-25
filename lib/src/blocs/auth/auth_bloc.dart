@@ -1,4 +1,6 @@
 import 'package:bloc/bloc.dart';
+import 'package:e_kafel/src/services/email_link_service.dart';
+import 'package:e_kafel/src/services/fcm_service.dart';
 import 'package:equatable/equatable.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -13,9 +15,15 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final AuthService _authService;
   final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
   final FirestoreService _firestoreService = FirestoreService();
+  final EmailLinkService _emailLinkService = EmailLinkService();
+  final FCMService _fcmService = FCMService();
 
   AuthBloc(this._authService) : super(AuthInitial()) {
     on<AppStarted>(_onAppStarted);
+    on<SendEmailVerificationRequested>(_onSendEmailVerificationRequested);
+    on<VerifyEmailCodeRequested>(_onVerifyEmailCodeRequested);
+    on<UnlinkEmailRequested>(_onUnlinkEmailRequested);
+    on<CheckEmailLinkStatus>(_onCheckEmailLinkStatus);
     on<LoginButtonPressed>(_onLoginButtonPressed);
     on<LogoutButtonPressed>(_onLogoutButtonPressed);
     on<SignOutButtonPressed>(_onSignOutButtonPressed);
@@ -23,8 +31,14 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<ResetPasswordRequested>(_onResetPasswordRequested);
   }
 
-  // ====== App Started ======
   Future<void> _onAppStarted(AppStarted event, Emitter<AuthState> emit) async {
+    try {
+      // تهيئة FCM Service
+      await _fcmService.initialize();
+    } catch (e) {
+      print('⚠️ فشل تهيئة FCM: $e');
+    }
+
     final user = _firebaseAuth.currentUser;
     if (user == null) {
       emit(AuthUnauthenticated());
@@ -42,7 +56,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     final isActive = (data['isActive'] as bool?) ?? true;
     if (!isActive) {
       await _firebaseAuth.signOut();
-      emit( AuthUnauthenticated(
+      emit(AuthUnauthenticated(
         message: 'تم إلغاء تفعيل حسابك. تواصل مع الإدارة.',
       ));
       return;
@@ -58,6 +72,116 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       ),
     );
   }
+
+  Future<void> _onSendEmailVerificationRequested(
+    SendEmailVerificationRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    try {
+      emit(AuthLoading());
+      final currentState = state;
+      if (currentState is AuthAuthenticated) {
+        await _emailLinkService.sendVerificationEmail(
+          email: event.email,
+          userId: currentState.userData['uid'],
+        );
+        
+        // إرسال إشعار محلي برمز التحقق
+        final verificationCode = await _getVerificationCode(currentState.userData['uid']);
+        if (verificationCode != null) {
+          await _fcmService.sendVerificationNotification(verificationCode);
+        }
+        
+        emit(EmailVerificationSent(event.email));
+      } else {
+        emit(const AuthErrorState(message: 'يجب تسجيل الدخول أولاً'));
+      }
+    } catch (e) {
+      emit(AuthErrorState(message: e.toString()));
+    }
+  }
+
+  Future<String?> _getVerificationCode(String userId) async {
+    try {
+      final doc = await _firestoreService
+          .collection('emailLinkRequests')
+          .doc(userId)
+          .get();
+      if (doc.exists) {
+        return doc.data()?['verificationCode'] as String?;
+      }
+    } catch (e) {
+      print('فشل الحصول على رمز التحقق: $e');
+    }
+    return null;
+  }
+
+  Future<void> _onVerifyEmailCodeRequested(
+    VerifyEmailCodeRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    try {
+      emit(AuthLoading());
+      final currentState = state;
+      if (currentState is AuthAuthenticated) {
+        await _emailLinkService.verifyEmailCode(
+          email: event.email,
+          code: event.code,
+          userId: currentState.userData['uid'],
+        );
+        emit(EmailVerified(event.email));
+        // إعادة تحميل حالة المستخدم
+        add(CheckEmailLinkStatus());
+      } else {
+        emit(const AuthErrorState(message: 'يجب تسجيل الدخول أولاً'));
+      }
+    } catch (e) {
+      emit(AuthErrorState(message: e.toString()));
+    }
+  }
+
+  Future<void> _onUnlinkEmailRequested(
+    UnlinkEmailRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    try {
+      emit(AuthLoading());
+      final currentState = state;
+      if (currentState is AuthAuthenticated) {
+        await _emailLinkService.unlinkEmail(currentState.userData['uid']);
+        emit(const EmailUnlinked());
+        // إعادة تحميل حالة المستخدم
+        add(CheckEmailLinkStatus());
+      } else {
+        emit(const AuthErrorState(message: 'يجب تسجيل الدخول أولاً'));
+      }
+    } catch (e) {
+      emit(AuthErrorState(message: e.toString()));
+    }
+  }
+
+  Future<void> _onCheckEmailLinkStatus(
+    CheckEmailLinkStatus event,
+    Emitter<AuthState> emit,
+  ) async {
+    try {
+      final currentState = state;
+      if (currentState is AuthAuthenticated) {
+        final status = await _emailLinkService.getEmailLinkStatus(currentState.userData['uid']);
+        emit(EmailLinkStatusChecked(
+          isLinked: status?['isLinked'] ?? false,
+          email: status?['email'],
+          isVerified: status?['verified'] ?? false,
+        ));
+      }
+    } catch (e) {
+      // لا نعرض خطأ هنا لأنه ليس حرجاً
+      print('Error checking email link status: $e');
+    }
+  }
+
+  // باقي الدوال كما هي بدون تغيير (_onLoginButtonPressed, _onLogoutButtonPressed, etc.)
+  // ... [جميع الدوال الأخرى تبقى كما هي بدون تعديل]
 
   // ====== Login (email or customId) ======
   Future<void> _onLoginButtonPressed(
@@ -126,7 +250,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       final isActive = (userData['isActive'] as bool?) ?? true;
       if (!isActive) {
         await _firebaseAuth.signOut();
-        emit( AuthUnauthenticated(
+        emit(AuthUnauthenticated(
           message: 'تم إلغاء تفعيل حسابك. لن تتمكن من تسجيل الدخول.',
         ));
         return;
@@ -214,7 +338,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       final isActive = (data['isActive'] as bool?) ?? true;
       if (!isActive) {
         await _firebaseAuth.signOut();
-        emit( AuthUnauthenticated(
+        emit(AuthUnauthenticated(
           message: 'تم إنشاء الحساب لكن غير مفعّل بعد.',
         ));
         return;

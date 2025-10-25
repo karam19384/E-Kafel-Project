@@ -72,11 +72,19 @@ class SignUpButtonPressed extends AuthEvent {
   ];
 }
 
-// ✅ حدث جديد للتسجيل عبر Google
-class GoogleSignInButtonPressed extends AuthEvent {}
+// في auth_event.dart
+class ChangePasswordRequested extends AuthEvent {
+  final String currentPassword;
+  final String newPassword;
 
-// ✅ حدث جديد للتسجيل عبر Facebook
-class FacebookSignInButtonPressed extends AuthEvent {}
+  const ChangePasswordRequested({
+    required this.currentPassword,
+    required this.newPassword,
+  });
+
+  @override
+  List<Object> get props => [currentPassword, newPassword];
+}
 
 // ✅ حدث جديد لإعادة تعيين كلمة المرور
 class ResetPasswordRequested extends AuthEvent {
@@ -89,3 +97,47 @@ class ResetPasswordRequested extends AuthEvent {
 }
 
 class SignOutButtonPressed extends AuthEvent {}
+
+class LinkWithGoogleRequested extends AuthEvent {
+  const LinkWithGoogleRequested();
+}
+
+class UnlinkGoogleRequested extends AuthEvent {
+  const UnlinkGoogleRequested();
+}
+
+class CheckGoogleLinkStatus extends AuthEvent {
+  const CheckGoogleLinkStatus();
+}
+
+// في auth_event.dart - أضف هذه الأحداث
+class SendEmailVerificationRequested extends AuthEvent {
+  final String email;
+  const SendEmailVerificationRequested(this.email);
+  
+  @override
+  List<Object> get props => [email];
+}
+
+class VerifyEmailCodeRequested extends AuthEvent {
+  final String email;
+  final String code;
+  const VerifyEmailCodeRequested(this.email, this.code);
+  
+  @override
+  List<Object> get props => [email, code];
+}
+
+class UnlinkEmailRequested extends AuthEvent {
+  const UnlinkEmailRequested();
+  
+  @override
+  List<Object> get props => [];
+}
+
+class CheckEmailLinkStatus extends AuthEvent {
+  const CheckEmailLinkStatus();
+  
+  @override
+  List<Object> get props => [];
+}

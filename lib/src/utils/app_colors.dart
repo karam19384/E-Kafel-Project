@@ -22,4 +22,10 @@ class AppColors {
   static const Color warningColor = Colors.orange;
   static const Color errorColor = Colors.red;
   static const Color infoColor = Colors.blue;
+
+  
+  // ألوان إضافية للوضع المظلم
+  static const Color darkBackground = Color(0xFF1E1E1E);
+  static const Color darkSurface = Color(0xFF2D2D2D);
+  static const Color darkText = Color(0xFFFFFFFF);
 }

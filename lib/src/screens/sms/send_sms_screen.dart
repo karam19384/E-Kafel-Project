@@ -12,7 +12,7 @@ import '../Auth/login_screen.dart';
 class SendSMSScreen extends StatefulWidget {
   static const routeName = '/send_sms_screen';
 
-  const SendSMSScreen({super.key});
+  const SendSMSScreen({super.key, required String recipientNumber});
 
   @override
   State<SendSMSScreen> createState() => _SendSMSScreenState();

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:e_kafel/src/blocs/profile/profile_bloc.dart';
+import 'package:e_kafel/src/blocs/settings/settings_bloc.dart';
 import 'package:e_kafel/src/blocs/supervisors/supervisors_bloc.dart';
 import 'package:e_kafel/src/models/user_model.dart';
 import 'package:e_kafel/src/screens/auth/splash_screen.dart';
@@ -31,6 +32,8 @@ import 'package:e_kafel/src/screens/Auth/login_screen.dart';
 import 'package:e_kafel/src/screens/Home/home_screen.dart';
 import 'package:e_kafel/src/services/auth_service.dart';
 import 'package:e_kafel/src/services/firestore_service.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'firebase_options.dart';
 import 'src/blocs/orphans/orphans_bloc.dart';
 import 'src/blocs/reports/reports_bloc.dart';
@@ -38,6 +41,8 @@ import 'src/blocs/send_sms/send_sms_bloc.dart';
 import 'src/blocs/sponsership/sponsership_bloc.dart';
 import 'src/blocs/tasks/tasks_bloc.dart';
 import 'src/blocs/visit/visit_bloc.dart';
+import 'src/models/setting_model.dart';
+import 'src/screens/onboarding/onboarding_screen.dart';
 import 'src/screens/orphans/orphan_details_screen.dart';
 import 'src/screens/reports/reports_screen.dart';
 import 'src/screens/supervisors/edit_supervisors_details_screen.dart';
@@ -46,7 +51,6 @@ import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 
-/// فئة لإدارة تهيئة التطبيق
 class AppInitializer {
   static bool _isInitialized = false;
 
@@ -128,23 +132,24 @@ class AppInitializer {
   }
 }
 
-/// فئة مركزية لإدارة المسارات
 class AppRoutes {
   static const String home = '/';
-  static const String login = '/login';
+  static const String login = '/login_screen';
+  static const String onboarding = '/onboarding';
+  static const String splash = '/splash';
   static const String orphansList = '/orphans_list_screen';
-  static const String orphanDetails = '/orphan-details';
-  static const String addOrphan = '/add-orphan';
-  static const String editOrphan = '/edit-orphan';
-  static const String orphanArchive = '/orphan-archive';
-  static const String tasks = '/tasks';
-  static const String reports = '/reports';
-  static const String fieldVisits = '/field-visits';
-  static const String profile = '/profile';
+  static const String orphanDetails = '/orphan_details_screen';
+  static const String addOrphan = '/add_new_orphan_screen';
+  static const String editOrphan = '/edit_orphan_details_screen';
+  static const String orphanArchive = '/orphan_archive_list_screen';
+  static const String tasks = '/tasks_screen';
+  static const String reports = '/reports_screen';
+  static const String fieldVisits = '/field_visits_screen';
+  static const String profile = '/profile_screen';
   static const String editProfile = '/edit-profile';
-  static const String sponsorship = '/sponsorship';
-  static const String settings = '/settings';
-  static const String sendSms = '/send-sms';
+  static const String sponsorship = '/sponsorship_management_screen';
+  static const String settings = '/settings_screen';
+  static const String sendSms = '/send_sms_screen';
   static const String supervisors = '/supervisors';
   static const String addSupervisor = '/add-supervisor';
   static const String editSupervisor = '/edit-supervisor';
@@ -156,6 +161,12 @@ class AppRoutes {
     switch (setting.name) {
       case home:
         return MaterialPageRoute(builder: (_) => const AppRoot());
+      
+      case splash:
+        return MaterialPageRoute(builder: (_) => const SplashScreen());
+      
+      case onboarding:
+        return MaterialPageRoute(builder: (_) => const OnboardingScreen(onboardingComplete: _completeOnboarding));
       
       case login:
         return MaterialPageRoute(builder: (_) => const LoginScreen());
@@ -227,7 +238,9 @@ class AppRoutes {
         return MaterialPageRoute(builder: (_) => const SettingsScreen());
       
       case sendSms:
-        return MaterialPageRoute(builder: (_) => const SendSMSScreen());
+        return MaterialPageRoute(builder: (_) => const SendSMSScreen(
+          recipientNumber: '',
+        ));
       
       case supervisors:
         if (args is Map<String, dynamic>) {
@@ -275,6 +288,11 @@ class AppRoutes {
     }
   }
 
+  static Future<void> _completeOnboarding() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('hasSeenOnboarding', true);
+  }
+
   static MaterialPageRoute<dynamic> _buildErrorRoute(String message) {
     return MaterialPageRoute(
       builder: (_) => Scaffold(
@@ -312,38 +330,64 @@ class AppRoutes {
   }
 }
 
-class AppRoot extends StatelessWidget {
+class AppRoot extends StatefulWidget {
   const AppRoot({super.key});
 
   @override
+  State<AppRoot> createState() => _AppRootState();
+}
+
+class _AppRootState extends State<AppRoot> {
+  bool _isLoading = true;
+  bool _hasSeenOnboarding = false;
+  User? _currentUser;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeApp();
+  }
+
+  Future<void> _initializeApp() async {
+    try {
+      // التحقق مما إذا كان المستخدم قد رأى شاشات Onboarding
+      final prefs = await SharedPreferences.getInstance();
+      _hasSeenOnboarding = prefs.getBool('hasSeenOnboarding') ?? false;
+
+      // التحقق من حالة تسجيل الدخول الحالية
+      _currentUser = FirebaseAuth.instance.currentUser;
+
+      setState(() {
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Error initializing app: $e');
+      }
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return StreamBuilder<User?>(
-      stream: FirebaseAuth.instance.authStateChanges(),
-      builder: (context, snapshot) {
-        // حالة التحميل
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const SplashScreen();
-        }
+    if (_isLoading) {
+      return const SplashScreen();
+    }
 
-        if (snapshot.hasError) {
-          return ErrorScreen(
-            error: snapshot.error.toString(),
-            onRetry: () {
-              final authBloc = context.read<AuthBloc>();
-              authBloc.add( CheckAuthStatus());
-            },
-          );
-        }
+    // إذا لم ير المستخدم Onboarding من قبل
+    if (!_hasSeenOnboarding) {
+      return const OnboardingScreen(onboardingComplete: _completeOnboarding);
+    }
 
-        final user = snapshot.data;
-        
-        if (user != null && _isValidUser(user)) {
-          return const HomeScreen();
-        }
+    // إذا كان المستخدم مسجل الدخول
+    if (_currentUser != null && _isValidUser(_currentUser!)) {
+      return const HomeScreen();
+    }
 
-        return const LoginScreen();
-      },
-    );
+    // إذا لم يكن مسجل الدخول
+    return const LoginScreen();
   }
 
   bool _isValidUser(User user) {
@@ -354,9 +398,13 @@ class AppRoot extends StatelessWidget {
   bool _isTestUser(User user) {
     return kDebugMode && (user.email?.contains('test') == true);
   }
+
+  static Future<void> _completeOnboarding() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('hasSeenOnboarding', true);
+  }
 }
 
-/// شاشة التحميل
 class LoadingScreen extends StatelessWidget {
   const LoadingScreen({super.key});
 
@@ -387,7 +435,6 @@ class LoadingScreen extends StatelessWidget {
   }
 }
 
-/// شاشة الخطأ
 class ErrorScreen extends StatelessWidget {
   final String error;
   final VoidCallback? onRetry;
@@ -446,7 +493,6 @@ class ErrorScreen extends StatelessWidget {
   }
 }
 
-/// فئة مقدمي الخدمات (Service Providers)
 class AppProviders extends StatelessWidget {
   final Widget child;
 
@@ -504,6 +550,10 @@ class AppProviders extends StatelessWidget {
         BlocProvider<SMSBloc>(
           create: (_) => SMSBloc(SMSService()),
         ),
+
+         BlocProvider<SettingsBloc>(
+      create: (context) => SettingsBloc(firestoreService),
+    ),
       ],
       child: child,
     );
@@ -511,7 +561,6 @@ class AppProviders extends StatelessWidget {
 }
 
 void main() {
-  // تشغيل التطبيق مع معالجة الأخطاء
   runZonedGuarded(() async {
     await AppInitializer.initialize();
     runApp(const MyApp());
@@ -529,52 +578,132 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AppProviders(
-      child: MaterialApp(
-        title: 'E-Kafel App',
-        theme: _buildAppTheme(),
-        darkTheme: _buildDarkTheme(),
-        themeMode: ThemeMode.light,
-        debugShowCheckedModeBanner: false,
-        initialRoute: AppRoutes.home,
-        onGenerateRoute: AppRoutes.generateRoute,
-        navigatorObservers: [
-          FirebaseAnalyticsObserver(analytics: FirebaseAnalytics.instance),
-        ],
-        builder: (context, child) {
-          return MediaQuery(
-            data: MediaQuery.of(context).copyWith(
-              textScaleFactor: 1.0, // منع تكبير النص
-            ),
-            child: child!,
+      child: BlocBuilder<SettingsBloc, SettingsState>(
+        builder: (context, state) {
+          // استخدام الإعدادات من البلوك لتطبيق الثيم واللغة
+          SettingsModel settings;
+          if (state is SettingsLoaded) {
+            settings = state.settings;
+          } else if (state is SettingsUpdated) {
+            settings = state.settings;
+          } else if (state is SettingsUpdating) {
+            settings = state.settings;
+          } else {
+            settings = SettingsModel.defaultSettings;
+          }
+
+          return MaterialApp(
+            title: 'E-Kafel App',
+            theme: _buildAppTheme(settings, false),
+            darkTheme: _buildAppTheme(settings, true),
+            themeMode: settings.isDarkMode ? ThemeMode.dark : ThemeMode.light,
+            debugShowCheckedModeBanner: false,
+            initialRoute: AppRoutes.splash,
+            onGenerateRoute: AppRoutes.generateRoute,
+            navigatorObservers: [
+              FirebaseAnalyticsObserver(analytics: FirebaseAnalytics.instance),
+            ],
+            locale: _getLocale(settings.language),
+            localizationsDelegates: const [
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: const [
+              Locale('ar'), // Arabic
+              Locale('en'), // English
+            ],
+            builder: (context, child) {
+              return MediaQuery(
+                data: MediaQuery.of(context).copyWith(
+                  textScaleFactor: _getTextScaleFactor(settings.fontSize),
+                ),
+                child: Directionality(
+                  textDirection: _getTextDirection(settings.language),
+                  child: child!,
+                ),
+              );
+            },
           );
         },
       ),
     );
   }
 
-  ThemeData _buildAppTheme() {
-    return ThemeData(
-      primarySwatch: Colors.green,
-      visualDensity: VisualDensity.adaptivePlatformDensity,
-      fontFamily: 'Tajawal', // خط عربي مناسب
-      appBarTheme: const AppBarTheme(
+  // باقي الدوال تبقى كما هي...
+  Color _getThemeColor(String themeColor) {
+    switch (themeColor) {
+      case 'أزرق':
+        return Colors.blue;
+      case 'أحمر':
+        return Colors.red;
+      case 'بنفسجي':
+        return Colors.purple;
+      case 'برتقالي':
+        return Colors.orange;
+      default: // 'أخضر أساسي'
+        return const Color(0xFF6DAF97);
+    }
+  }
+
+  double _getTextScaleFactor(String fontSize) {
+    switch (fontSize) {
+      case 'صغير':
+        return 0.9;
+      case 'كبير':
+        return 1.2;
+      case 'كبير جداً':
+        return 1.4;
+      default: // 'متوسط'
+        return 1.0;
+    }
+  }
+
+  Locale _getLocale(String language) {
+    switch (language) {
+      case 'English':
+        return const Locale('en');
+      case 'Français':
+        return const Locale('fr');
+      case 'Español':
+        return const Locale('es');
+      default: // 'العربية'
+        return const Locale('ar');
+    }
+  }
+
+  TextDirection _getTextDirection(String language) {
+    switch (language) {
+      case 'English':
+      case 'Français':
+      case 'Español':
+        return TextDirection.ltr;
+      default: // 'العربية'
+        return TextDirection.rtl;
+    }
+  }
+
+  ThemeData _buildAppTheme(SettingsModel settings, bool isDark) {
+    final baseTheme = isDark ? ThemeData.dark() : ThemeData.light();
+    final primaryColor = _getThemeColor(settings.themeColor);
+    
+    return baseTheme.copyWith(
+      primaryColor: primaryColor,
+      colorScheme: baseTheme.colorScheme.copyWith(
+        primary: primaryColor,
+        secondary: primaryColor.withOpacity(0.8),
+      ),
+      appBarTheme: AppBarTheme(
+        backgroundColor: primaryColor,
+        foregroundColor: Colors.white,
         centerTitle: true,
         elevation: 2,
       ),
+      visualDensity: VisualDensity.adaptivePlatformDensity,
       inputDecorationTheme: InputDecorationTheme(
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
         ),
-      ),
-    );
-  }
-
-  ThemeData _buildDarkTheme() {
-    return ThemeData.dark().copyWith(
-      primaryColor: Color(0xFF6DAF97),
-      appBarTheme: const AppBarTheme(
-        centerTitle: true,
-        elevation: 2,
       ),
     );
   }
